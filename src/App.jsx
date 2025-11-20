@@ -668,6 +668,20 @@ export default function StoryBuilder() {
         {/* Height set to 50vh on mobile to balance with controls */}
         <div className="relative w-full h-[50vh] md:h-full md:flex-1 bg-[#121212] flex flex-col items-center justify-center overflow-hidden select-none order-first md:order-last shrink-0 border-b md:border-b-0 md:border-l border-white/10">
             
+            {/* Mobile Warning Banner */}
+            <div className="md:hidden absolute top-4 left-4 max-w-[60%] z-30 pointer-events-none">
+               <div className="bg-black/70 backdrop-blur-md border border-orange-500/30 p-2.5 rounded-lg shadow-lg">
+                   <div className="flex items-start gap-2">
+                       <AlertTriangle className="w-3 h-3 text-orange-500 shrink-0 mt-0.5"/>
+                       <div className="text-[10px] leading-tight text-gray-300 space-y-1">
+                           <p><span className="text-orange-500 font-bold">Notice:</span> Mobile preview performance is limited.</p>
+                           <p>Please <span className="text-white font-medium">download the video</span> to see the actual result.</p>
+                           <p className="opacity-70">For the full experience, please use a desktop. We are actively working to solve mobile issues.</p>
+                       </div>
+                   </div>
+               </div>
+            </div>
+
             {/* Universal Floating Export Button (Visible on all screen sizes) */}
             <div className="absolute top-4 right-4 md:top-6 md:right-6 z-50">
                 <button 
