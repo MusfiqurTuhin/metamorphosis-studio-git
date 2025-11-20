@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp } from 'lucide-react';
 
 // --- AMP Boilerplate ---
@@ -109,30 +109,38 @@ export default function StoryBuilder() {
 
  const [activePageIndex, setActivePageIndex] = useState(0);
  const [activeTab, setActiveTab] = useState('content');
- const [activeLayerId, setActiveLayerId] = useState('h1');
+ const [activeLayerId, setActiveLayerId] = useState(null);
  const [isExportingVideo, setIsExportingVideo] = useState(false);
  const [exportProgress, setExportProgress] = useState(0);
  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
  const [isPlaying, setIsPlaying] = useState(false);
- const [exportFormat, setExportFormat] = useState('');
  const [exportScope, setExportScope] = useState('all');
  const [dragTarget, setDragTarget] = useState(null);
- const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
  const [previewScale, setPreviewScale] = useState(0.5);
+ 
  // Refs
  const canvasRef = useRef(null);
  const containerRef = useRef(null);
  const previewRef = useRef(null);
-
+ const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
+ const loadedImageRef = useRef(null);
+ const requestRef = useRef(null);
+ 
  const activePage = pages[activePageIndex] || pages[0];
  const activeLayer = activePage.texts.find(t => t.id === activeLayerId);
 
- // --- INIT ---
+ // --- INIT & SAFETY ---
  useEffect(() => {
-   if (activePage.texts.length > 0 && (!activeLayer || !activePage.texts.find(t => t.id === activeLayerId))) {
-       setActiveLayerId(activePage.texts[0].id);
+   // Ensure valid activeLayerId
+   if (activePage.texts.length > 0) {
+       if (!activeLayerId || !activePage.texts.find(t => t.id === activeLayerId)) {
+          // Don't force selection, just clear invalid ones
+          if(activeLayerId) setActiveLayerId(null);
+       }
+   } else {
+      setActiveLayerId(null);
    }
- }, [activePageIndex, activePage.texts.length]);
+ }, [activePageIndex, activePage.texts, activeLayerId]);
 
  // --- RESIZING ENGINE ---
  useEffect(() => {
@@ -142,8 +150,7 @@ export default function StoryBuilder() {
          const { width: containerW, height: containerH } = containerRef.current.getBoundingClientRect();
          if (containerW <= 0 || containerH <= 0) return;
 
-         // Standardize padding
-         const padding = 20; 
+         const padding = 40; 
          const availableW = Math.max(50, containerW - padding);
          const availableH = Math.max(50, containerH - padding);
         
@@ -155,10 +162,29 @@ export default function StoryBuilder() {
     
      const observer = new ResizeObserver(updateScale);
      observer.observe(containerRef.current);
+     window.addEventListener('resize', updateScale);
     
      updateScale();
-     return () => observer.disconnect();
+     return () => {
+         observer.disconnect();
+         window.removeEventListener('resize', updateScale);
+     };
  }, [resolution]);
+
+ // --- IMAGE PRELOADER ---
+ // Loads the image into a Ref so we don't create new HTMLImageElements on every render
+ useEffect(() => {
+     if(!activePage.image) return;
+     const img = new Image();
+     img.crossOrigin = "anonymous";
+     img.src = activePage.image;
+     img.onload = () => {
+         loadedImageRef.current = img;
+         // Force a single re-render to update canvas once image loads
+         drawFrame(canvasRef.current?.getContext('2d'), { ...activePage, imgElement: img }, 1.0);
+     };
+ }, [activePage.image]);
+
 
  // --- FUNCTIONS ---
 
@@ -171,24 +197,34 @@ export default function StoryBuilder() {
      }
  };
 
- const updatePage = (updates) => {
-     const newPages = [...pages];
-     newPages[activePageIndex] = { ...newPages[activePageIndex], ...updates };
-     setPages(newPages);
- };
+ // Wrap updates in useCallback to keep handleMove stable
+ const updatePage = useCallback((updates) => {
+     setPages(prevPages => {
+         const newPages = [...prevPages];
+         newPages[activePageIndex] = { ...newPages[activePageIndex], ...updates };
+         return newPages;
+     });
+ }, [activePageIndex]);
 
- const updateTextLayer = (id, field, value) => {
-     const newTexts = activePage.texts.map(t => t.id === id ? { ...t, [field]: value } : t);
-     updatePage({ texts: newTexts });
- };
+ const updateTextLayer = useCallback((id, field, value) => {
+     setPages(prevPages => {
+         const newPages = [...prevPages];
+         const currentPage = newPages[activePageIndex];
+         const newTexts = currentPage.texts.map(t => t.id === id ? { ...t, [field]: value } : t);
+         newPages[activePageIndex] = { ...currentPage, texts: newTexts };
+         return newPages;
+     });
+ }, [activePageIndex]);
 
  const handleNestedChange = (parent, field, value) => {
-   const newPages = [...pages];
-   newPages[activePageIndex] = {
-       ...newPages[activePageIndex],
-       [parent]: { ...newPages[activePageIndex][parent], [field]: value }
-   };
-   setPages(newPages);
+   setPages(prevPages => {
+       const newPages = [...prevPages];
+       newPages[activePageIndex] = {
+           ...newPages[activePageIndex],
+           [parent]: { ...newPages[activePageIndex][parent], [field]: value }
+       };
+       return newPages;
+   });
  }
 
  const handleImageUpload = (e) => {
@@ -206,37 +242,47 @@ export default function StoryBuilder() {
          id: newId, content: 'New Text',
          ...DEFAULT_TEXT_STYLE, x: 50, y: 50, bg: '#ffffff', color: '#000000', radius: 4
      };
-     updatePage({ texts: [...activePage.texts, newText] });
+     setPages(prevPages => {
+         const newPages = [...prevPages];
+         const currentPage = newPages[activePageIndex];
+         newPages[activePageIndex] = { ...currentPage, texts: [...currentPage.texts, newText] };
+         return newPages;
+     });
      setActiveLayerId(newId);
      setActiveTab('design');
  };
 
  const deleteLayer = (id) => {
-     const newTexts = activePage.texts.filter(t => t.id !== id);
-     updatePage({ texts: newTexts });
-     if (activeLayerId === id && newTexts.length > 0) setActiveLayerId(newTexts[0].id);
+     setPages(prevPages => {
+         const newPages = [...prevPages];
+         const currentPage = newPages[activePageIndex];
+         newPages[activePageIndex] = { ...currentPage, texts: currentPage.texts.filter(t => t.id !== id) };
+         return newPages;
+     });
+     if (activeLayerId === id) setActiveLayerId(null);
  };
 
  const addNewPage = () => {
-     const lastPage = pages[pages.length - 1];
-     const newId = Date.now();
-     const newPage = {
-         ...lastPage, id: newId,
-         texts: lastPage.texts.map(t => ({...t, id: Math.random().toString()}))
-     };
-     setPages([...pages, newPage]);
-     setActivePageIndex(pages.length);
+     setPages(prevPages => {
+         const lastPage = prevPages[prevPages.length - 1];
+         const newId = Date.now();
+         const newPage = {
+             ...lastPage, id: newId,
+             texts: lastPage.texts.map(t => ({...t, id: Math.random().toString()}))
+         };
+         return [...prevPages, newPage];
+     });
+     setActivePageIndex(prev => prev + 1);
  };
 
  const deletePage = () => {
      if (pages.length === 1) return alert("At least one page required.");
-     const newPages = pages.filter((_, i) => i !== activePageIndex);
-     setPages(newPages);
-     setActivePageIndex(Math.max(0, activePageIndex - 1));
+     setPages(prev => prev.filter((_, i) => i !== activePageIndex));
+     setActivePageIndex(prev => Math.max(0, prev - 1));
  };
 
- // --- DRAGGING SYSTEM (Unified Touch + Mouse) ---
-  const getClientCoordinates = (e) => {
+ // --- DRAGGING SYSTEM ---
+ const getClientCoordinates = (e) => {
      if (e.touches && e.touches.length > 0) {
          return { x: e.touches[0].clientX, y: e.touches[0].clientY };
      }
@@ -245,30 +291,33 @@ export default function StoryBuilder() {
 
  const startDrag = (e, target) => {
      if (target !== 'image') { e.stopPropagation(); setActiveLayerId(target); setActiveTab('design'); }
-     // Prevent default only if not input to allow focus, mostly prevent scroll on touch
-     if(e.type === 'touchstart') {
-        // don't prevent default immediately or inputs break
-     } else {
+     
+     if(e.type !== 'touchstart') {
         e.preventDefault();
      }
 
      let initialX = 0, initialY = 0;
-     if (target === 'image') { initialX = activePage.panX; initialY = activePage.panY; }
-     else { const layer = activePage.texts.find(t => t.id === target); if (layer) { initialX = layer.x; initialY = layer.y; } }
+     if (target === 'image') { 
+         initialX = activePage.panX; 
+         initialY = activePage.panY; 
+    } else { 
+        const layer = activePage.texts.find(t => t.id === target); 
+        if (layer) { initialX = layer.x; initialY = layer.y; } 
+    }
     
      const coords = getClientCoordinates(e);
      setDragTarget(target);
      dragStartRef.current = { x: coords.x, y: coords.y, initialX, initialY };
  };
 
- const handleMove = (e) => {
+ const handleMove = useCallback((e) => {
      if (!dragTarget) return;
      const coords = getClientCoordinates(e);
      const dxPx = coords.x - dragStartRef.current.x;
      const dyPx = coords.y - dragStartRef.current.y;
 
      if (dragTarget === 'image') {
-         const sensitivity = 0.2;
+         const sensitivity = 0.15; 
          const dX = (dxPx / previewScale) * sensitivity;
          const dY = (dyPx / previewScale) * sensitivity;
          const newPanX = Math.min(100, Math.max(0, dragStartRef.current.initialX - dX));
@@ -284,9 +333,9 @@ export default function StoryBuilder() {
          updateTextLayer(dragTarget, 'x', newX);
          updateTextLayer(dragTarget, 'y', newY);
      }
- };
+ }, [dragTarget, previewScale, resolution, updatePage, updateTextLayer]); 
 
- const handleEnd = () => setDragTarget(null);
+ const handleEnd = useCallback(() => setDragTarget(null), []);
 
  useEffect(() => {
    if (dragTarget) {
@@ -301,19 +350,25 @@ export default function StoryBuilder() {
        window.removeEventListener('touchmove', handleMove);
        window.removeEventListener('touchend', handleEnd);
    };
- }, [dragTarget, activePageIndex, previewScale]);
+ }, [dragTarget, handleMove, handleEnd]);
 
  // --- RENDERER ---
  const drawFrame = (ctx, pageData, progress) => {
+     if (!ctx) return;
      const { width, height } = ctx.canvas;
-     ctx.fillStyle = '#111'; ctx.fillRect(0, 0, width, height);
+     
+     ctx.fillStyle = '#111'; 
+     ctx.fillRect(0, 0, width, height);
 
      const img = pageData.imgElement;
      if (img) {
          ctx.save();
          if (pageData.filters) ctx.filter = `brightness(${pageData.filters.brightness}%) contrast(${pageData.filters.contrast}%) saturate(${pageData.filters.saturate}%)`;
+         
          let scale = 1, tx = 0, ty = 0;
-         const moveX = width * 0.1; const moveY = height * 0.1;
+         const moveX = width * 0.1; 
+         const moveY = height * 0.1;
+         
          switch(pageData.bgAnimation) {
             case 'zoom-in': scale = 1 + (0.15 * progress); break;
             case 'zoom-out': scale = 1.15 - (0.15 * progress); break;
@@ -324,55 +379,115 @@ export default function StoryBuilder() {
             case 'zoom-in-pan-right': scale = 1.1 + (0.1 * progress); tx = -(moveX * 0.5) + (moveX * progress); break;
             default: scale = 1;
          }
-         ctx.translate(width / 2, height / 2); ctx.scale(scale, scale); ctx.translate(tx, ty); ctx.translate(-width / 2, -height / 2);
+         
+         ctx.translate(width / 2, height / 2); 
+         ctx.scale(scale, scale); 
+         ctx.translate(tx, ty); 
+         ctx.translate(-width / 2, -height / 2);
         
-         const imgAspect = img.width / img.height; const canvasAspect = width / height;
+         const imgAspect = img.width / img.height; 
+         const canvasAspect = width / height;
          let renderW, renderH, offX, offY;
-         if (imgAspect > canvasAspect) { renderH = height; renderW = height * imgAspect; offX = (width - renderW) * (pageData.panX / 100); offY = 0; }
-         else { renderW = width; renderH = width / imgAspect; offX = 0; offY = (height - renderH) * (pageData.panY / 100); }
-         ctx.drawImage(img, offX, offY, renderW, renderH); ctx.restore();
+         
+         if (imgAspect > canvasAspect) { 
+             renderH = height; 
+             renderW = height * imgAspect; 
+             offX = (width - renderW) * (pageData.panX / 100); 
+             offY = 0; 
+        } else { 
+            renderW = width; 
+            renderH = width / imgAspect; 
+            offX = 0; 
+            offY = (height - renderH) * (pageData.panY / 100); 
+        }
+         
+         ctx.drawImage(img, offX, offY, renderW, renderH); 
+         ctx.restore();
      }
 
      const ov = pageData.overlay || { color: '#000000', opacity: 0.6, height: 40 };
-     const gradient = ctx.createLinearGradient(0, height * (1 - (ov.height/100)), 0, height);
-     gradient.addColorStop(0, 'rgba(0,0,0,0)'); gradient.addColorStop(1, ov.color);
-     ctx.save(); ctx.globalAlpha = ov.opacity; ctx.fillStyle = gradient; ctx.fillRect(0, height * (1 - (ov.height/100)), width, height * (ov.height/100)); ctx.restore();
+     if (ov.height > 0) {
+         const gradient = ctx.createLinearGradient(0, height * (1 - (ov.height/100)), 0, height);
+         gradient.addColorStop(0, 'rgba(0,0,0,0)'); 
+         gradient.addColorStop(1, ov.color);
+         ctx.save(); 
+         ctx.globalAlpha = ov.opacity; 
+         ctx.fillStyle = gradient; 
+         ctx.fillRect(0, height * (1 - (ov.height/100)), width, height * (ov.height/100)); 
+         ctx.restore();
+     }
 
      (pageData.texts || []).forEach(layer => {
          ctx.save();
          let alpha = layer.opacity !== undefined ? layer.opacity : 1;
-         let offsetY = 0, offsetX = 0; let displayText = layer.content;
+         let offsetY = 0, offsetX = 0; 
+         let displayText = layer.content;
          if (layer.uppercase) displayText = displayText.toUpperCase();
 
-         if (layer.animation === 'fade-up') { alpha *= Math.min(1, progress * 3); offsetY = (1 - Math.min(1, progress * 3)) * 30; }
-         else if (layer.animation === 'slide-in') { alpha *= Math.min(1, progress * 3); offsetX = -(1 - Math.min(1, progress * 3)) * 100; }
-         else if (layer.animation === 'typewriter') { const charCount = Math.floor(layer.content.length * Math.min(1, progress * 2)); displayText = layer.content.substring(0, charCount); if(layer.uppercase) displayText = displayText.toUpperCase(); }
-         else if (layer.animation === 'scale-up') { const s = 0.5 + (0.5 * Math.min(1, progress * 3)); ctx.translate(width*(layer.x/100), height*(layer.y/100)); ctx.scale(s, s); ctx.translate(-width*(layer.x/100), -height*(layer.y/100)); }
+         if (progress < 1.0) { 
+             if (layer.animation === 'fade-up') { alpha *= Math.min(1, progress * 3); offsetY = (1 - Math.min(1, progress * 3)) * 30; }
+             else if (layer.animation === 'slide-in') { alpha *= Math.min(1, progress * 3); offsetX = -(1 - Math.min(1, progress * 3)) * 100; }
+             else if (layer.animation === 'typewriter') { const charCount = Math.floor(layer.content.length * Math.min(1, progress * 2)); displayText = layer.content.substring(0, charCount); if(layer.uppercase) displayText = displayText.toUpperCase(); }
+             else if (layer.animation === 'scale-up') { const s = 0.5 + (0.5 * Math.min(1, progress * 3)); ctx.translate(width*(layer.x/100), height*(layer.y/100)); ctx.scale(s, s); ctx.translate(-width*(layer.x/100), -height*(layer.y/100)); }
+         }
 
-         ctx.globalAlpha = alpha; ctx.translate(offsetX, offsetY);
-         const x = width * (layer.x / 100); const y = height * (layer.y / 100);
-         const cleanFont = layer.font.replace(/"/g, "'"); const fontStyle = layer.italic ? 'italic' : 'normal';
+         ctx.globalAlpha = alpha; 
+         ctx.translate(offsetX, offsetY);
+         const x = width * (layer.x / 100); 
+         const y = height * (layer.y / 100);
+         
+         const cleanFont = layer.font.replace(/"/g, "'"); 
+         const fontStyle = layer.italic ? 'italic' : 'normal';
          ctx.font = `${fontStyle} ${layer.weight} ${layer.size}px ${cleanFont}`;
-         ctx.textAlign = layer.align; ctx.textBaseline = 'top'; if (layer.spacing > 0) ctx.letterSpacing = `${layer.spacing}px`;
+         ctx.textAlign = layer.align; 
+         ctx.textBaseline = 'top'; 
+         if (layer.spacing > 0) ctx.letterSpacing = `${layer.spacing}px`;
 
          const fullText = layer.uppercase ? layer.content.toUpperCase() : layer.content;
          const metrics = ctx.measureText(fullText);
         
          if (layer.bg && layer.bg !== 'transparent') {
-             const pW = metrics.width + 40; const pH = layer.size * 1.6;
-             let rectX = x; if (layer.align === 'center') rectX = x - (pW/2); if (layer.align === 'right') rectX = x - pW;
+             const pW = metrics.width + 40; 
+             const pH = layer.size * 1.6;
+             let rectX = x; 
+             if (layer.align === 'center') rectX = x - (pW/2); 
+             if (layer.align === 'right') rectX = x - pW;
+             
              if (layer.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 4; }
-             ctx.fillStyle = layer.bg; ctx.beginPath(); ctx.roundRect(rectX, y, pW, pH, layer.radius || 0); ctx.fill();
-             ctx.shadowColor = 'transparent'; ctx.fillStyle = layer.color;
-             let textX = rectX + 20; if (layer.align === 'center') textX = rectX + (pW/2); if (layer.align === 'right') textX = rectX + pW - 20;
+             ctx.fillStyle = layer.bg; 
+             ctx.beginPath(); 
+             if (ctx.roundRect) {
+                ctx.roundRect(rectX, y, pW, pH, layer.radius || 0);
+             } else {
+                 ctx.rect(rectX, y, pW, pH);
+             }
+             ctx.fill();
+             
+             ctx.shadowColor = 'transparent'; 
+             ctx.fillStyle = layer.color;
+             let textX = rectX + 20; 
+             if (layer.align === 'center') textX = rectX + (pW/2); 
+             if (layer.align === 'right') textX = rectX + pW - 20;
              ctx.fillText(displayText, textX, y + (pH - layer.size)/2 + 2);
          } else {
             if (layer.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2; }
             ctx.fillStyle = layer.color;
-            const maxWidth = width * 0.9; const words = displayText.split(' '); let line = ''; let lineY = y;
+            
+            const maxWidth = width * 0.9; 
+            const words = displayText.split(' '); 
+            let line = ''; 
+            let lineY = y;
+            
             for (let n = 0; n < words.length; n++) {
-               const testLine = line + words[n] + ' '; const m = ctx.measureText(testLine);
-               if (m.width > maxWidth && n > 0) { ctx.fillText(line, x, lineY); line = words[n] + ' '; lineY += (layer.size * (layer.lineHeight || 1.4)); } else { line = testLine; }
+               const testLine = line + words[n] + ' '; 
+               const m = ctx.measureText(testLine);
+               if (m.width > maxWidth && n > 0) { 
+                   ctx.fillText(line, x, lineY); 
+                   line = words[n] + ' '; 
+                   lineY += (layer.size * (layer.lineHeight || 1.4)); 
+               } else { 
+                   line = testLine; 
+               }
             }
             ctx.fillText(line, x, lineY);
          }
@@ -381,32 +496,83 @@ export default function StoryBuilder() {
  };
 
  // --- EXPORT ---
- const loadPageImage = (page) => new Promise(resolve => { const img = new Image(); img.crossOrigin = "anonymous"; img.src = page.image; img.onload = () => resolve({ ...page, imgElement: img }); img.onerror = () => resolve({ ...page, imgElement: null }); });
+ const loadPageImage = (page) => new Promise(resolve => { 
+     const img = new Image(); 
+     img.crossOrigin = "anonymous"; 
+     img.src = page.image; 
+     img.onload = () => resolve({ ...page, imgElement: img }); 
+     img.onerror = () => resolve({ ...page, imgElement: null }); 
+});
 
  const generateVideo = async () => {
-     setIsExportingVideo(true); setShowDownloadMenu(false); setIsPlaying(false); setExportProgress(0); setExportFormat('');
-     const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
-     canvas.width = resolution.width; canvas.height = resolution.height;
+     if (!window.MediaRecorder) return alert("Video export not supported in this browser.");
+
+     setIsExportingVideo(true); 
+     setShowDownloadMenu(false); 
+     setIsPlaying(false); 
+     setExportProgress(0);
+     
+     const canvas = canvasRef.current; 
+     const ctx = canvas.getContext('2d');
+     canvas.width = resolution.width; 
+     canvas.height = resolution.height;
     
      const pagesToRender = exportScope === 'current' ? [activePage] : pages;
      const loadedPages = await Promise.all(pagesToRender.map(loadPageImage));
+     
      const stream = canvas.captureStream(30);
-     const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 4000000 });
-     const chunks = []; mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-     mediaRecorder.onstop = () => { const blob = new Blob(chunks, { type: 'video/webm' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${metadata.title.replace(/\s+/g, '-')}.webm`; a.click(); setIsExportingVideo(false); };
-     mediaRecorder.start(); const FPS = 30; await document.fonts.ready;
+     
+     let mimeType = 'video/webm';
+     if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
+     else if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4'; 
+     
+     const mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+     const chunks = []; 
+     
+     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+     mediaRecorder.onstop = () => { 
+         const blob = new Blob(chunks, { type: mimeType }); 
+         const url = URL.createObjectURL(blob); 
+         const a = document.createElement('a'); 
+         a.href = url; 
+         a.download = `${metadata.title.replace(/\s+/g, '-')}.webm`; 
+         a.click(); 
+         setIsExportingVideo(false); 
+         drawFrame(ctx, { ...activePage, imgElement: loadedImageRef.current }, 1.0);
+    };
+     
+     mediaRecorder.start(); 
+     const FPS = 30; 
+     await document.fonts.ready;
+
      for (let i = 0; i < loadedPages.length; i++) {
-         const page = loadedPages[i]; const durationFrames = page.duration * FPS;
-         for (let frame = 0; frame < durationFrames; frame++) { drawFrame(ctx, page, frame / durationFrames); await new Promise(r => setTimeout(r, 1000 / FPS)); setExportProgress(prev => Math.min(99, prev + (100 / (loadedPages.length * durationFrames)))); }
+         const page = loadedPages[i]; 
+         const durationFrames = page.duration * FPS;
+         for (let frame = 0; frame < durationFrames; frame++) { 
+             drawFrame(ctx, page, frame / durationFrames); 
+             await new Promise(r => setTimeout(r, 1000 / FPS)); 
+             setExportProgress(prev => Math.min(99, prev + (100 / (loadedPages.length * durationFrames)))); 
+         }
      }
-     mediaRecorder.stop(); setExportProgress(100);
+     mediaRecorder.stop(); 
+     setExportProgress(100);
  };
 
  const downloadJPG = async () => {
-     setShowDownloadMenu(false); const canvas = canvasRef.current; if(!canvas) return; const ctx = canvas.getContext('2d');
-     canvas.width = resolution.width; canvas.height = resolution.height;
-     const loaded = await loadPageImage(activePage); drawFrame(ctx, loaded, 1.0);
-     const a = document.createElement('a'); a.download = 'slide.jpg'; a.href = canvas.toDataURL('image/jpeg', 0.9); a.click();
+     setShowDownloadMenu(false); 
+     const canvas = canvasRef.current; 
+     if(!canvas) return; 
+     const ctx = canvas.getContext('2d');
+     canvas.width = resolution.width; 
+     canvas.height = resolution.height;
+     
+     const loaded = await loadPageImage(activePage); 
+     drawFrame(ctx, loaded, 1.0);
+     
+     const a = document.createElement('a'); 
+     a.download = 'slide.jpg'; 
+     a.href = canvas.toDataURL('image/jpeg', 0.9); 
+     a.click();
  };
 
  const generateHTML = () => {
@@ -415,7 +581,8 @@ export default function StoryBuilder() {
      pages.forEach((page) => {
          const imgFilters = `filter: brightness(${page.filters.brightness}%) contrast(${page.filters.contrast}%) saturate(${page.filters.saturate}%);`;
          const ov = page.overlay;
-         const gradStyle = `background: linear-gradient(to top, ${ov.color}${Math.round(ov.opacity*255).toString(16).padStart(2,'0')} 0%, transparent 100%); height: ${ov.height}%;`;
+         const alphaHex = Math.round(ov.opacity * 255).toString(16).padStart(2, '0');
+         const gradStyle = `background: linear-gradient(to top, ${ov.color}${alphaHex} 0%, transparent 100%); height: ${ov.height}%;`;
         
          let layersHTML = page.texts.map(t => {
             const cleanFont = t.font.replace(/"/g, "'");
@@ -436,7 +603,15 @@ export default function StoryBuilder() {
            <amp-story-grid-layer template="vertical" class="gradient-overlay" style="${gradStyle}">${layersHTML}</amp-story-grid-layer>
          </amp-story-page>`;
      });
-     const finalHTML = AMP_BOILERPLATE.replace('__PAGES__', pagesHTML).replace(/__TITLE__/g, metadata.title).replace('__PUBLISHER__', metadata.publisher).replace('__LOGO__', metadata.logo).replace('__POSTER__', metadata.poster).replace('__CANONICAL_URL__', metadata.canonical);
+     
+     const finalHTML = AMP_BOILERPLATE
+        .replace('__PAGES__', pagesHTML)
+        .replace(/__TITLE__/g, metadata.title)
+        .replace('__PUBLISHER__', metadata.publisher)
+        .replace('__LOGO__', metadata.logo)
+        .replace('__POSTER__', metadata.poster)
+        .replace('__CANONICAL_URL__', metadata.canonical);
+        
      const blob = new Blob([finalHTML], { type: 'text/html' });
      const url = URL.createObjectURL(blob);
      const a = document.createElement('a'); a.href = url; a.download = `story.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -447,32 +622,41 @@ export default function StoryBuilder() {
      const canvas = canvasRef.current;
      if(!canvas) return;
      const ctx = canvas.getContext('2d');
-     const img = new Image();
-     img.crossOrigin = "anonymous";
-     img.src = activePage.image;
-     let animId;
-     const render = () => {
-        img.onload = () => {
-            if (isPlaying) {
-                const duration = activePage.duration * 1000;
-                const start = performance.now();
-                const loop = (time) => {
-                    const elapsed = time - start;
-                    drawFrame(ctx, { ...activePage, imgElement: img }, (elapsed % duration) / duration);
-                    animId = requestAnimationFrame(loop);
-                };
-                animId = requestAnimationFrame(loop);
-            } else {
-                drawFrame(ctx, { ...activePage, imgElement: img }, 1.0);
-            }
-        };
+     
+     const render = (time) => {
+        const img = loadedImageRef.current;
+        const pageData = { ...activePage, imgElement: img };
+
+        if (isPlaying) {
+            const duration = activePage.duration * 1000;
+            if (!requestRef.current.startTime) requestRef.current.startTime = time;
+            const elapsed = time - requestRef.current.startTime;
+            drawFrame(ctx, pageData, (elapsed % duration) / duration);
+            requestRef.current.id = requestAnimationFrame(render);
+        } else {
+            drawFrame(ctx, pageData, 1.0);
+        }
      };
-     render();
-     return () => cancelAnimationFrame(animId);
- }, [activePageIndex, pages, isPlaying, resolution, previewScale]);
+
+     if (isPlaying) {
+         requestRef.current = { startTime: null };
+         requestRef.current.id = requestAnimationFrame(render);
+     } else {
+         render(performance.now());
+         if (requestRef.current?.id) cancelAnimationFrame(requestRef.current.id);
+     }
+
+     return () => {
+         if (requestRef.current?.id) cancelAnimationFrame(requestRef.current.id);
+     };
+ }, [activePage, isPlaying, resolution, previewScale]); 
 
  return (
    <div className="flex flex-col md:flex-row h-[100dvh] bg-black text-white overflow-hidden font-sans selection:bg-orange-500/30">
+     
+     {/* Font Injection for Canvas */}
+     <link href="https://fonts.googleapis.com/css2?family=Atma:wght@300;400;500;600;700&family=Baloo+Da+2:wght@400;500;600;700;800&family=Galada&family=Hind+Siliguri:wght@300;400;500;600;700&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Mina:wght@400;700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif+Bengali:wght@100..900&family=Oswald:wght@200..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Tiro+Bangla:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet" />
+     
      <div className="hidden"><canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} /></div>
 
      {/* MOBILE HEADER */}
@@ -508,11 +692,9 @@ export default function StoryBuilder() {
      </div>
 
      {/* SPLIT LAYOUT CONTAINER */}
-     {/* Mobile: Flex Column | Desktop: Flex Row */}
      <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden relative">
         
-        {/* --- PREVIEW PANE (Top on Mobile, Right on Desktop) --- */}
-        {/* Mobile: Fixed 40% height, flexible content. Desktop: Flex-1 */}
+        {/* --- PREVIEW PANE --- */}
         <div className="relative w-full h-[40vh] md:h-full md:flex-1 bg-[#121212] flex flex-col items-center justify-center overflow-hidden select-none order-first md:order-last shrink-0 border-b md:border-b-0 md:border-l border-white/10">
             
             {/* Desktop Export Button */}
@@ -541,7 +723,7 @@ export default function StoryBuilder() {
                 <button onClick={() => setActivePageIndex(Math.min(pages.length-1, activePageIndex+1))} className="p-1.5 hover:bg-white/10 rounded-full transition-colors"><ChevronRight className="text-white w-4 h-4 md:w-5 md:h-5"/></button>
             </div>
 
-            {/* Canvas Container - Fits in the 40vh perfectly */}
+            {/* Canvas Container */}
             <div ref={containerRef} className="w-full h-full flex items-center justify-center relative p-4">
                 <div ref={previewRef} className="relative shadow-2xl"
                     style={{ width: resolution.width, height: resolution.height, transform: `scale(${previewScale})`, transformOrigin: 'center center' }}
@@ -549,28 +731,51 @@ export default function StoryBuilder() {
                     onTouchStart={(e) => startDrag(e, 'image')}>
                     <canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} className="w-full h-full block bg-[#1a1a1a]" />
                     
-                    {/* Text Layers */}
-                    {activePage.texts.map(text => (
-                        <div key={text.id}
-                            onMouseDown={(e) => startDrag(e, text.id)}
-                            onTouchStart={(e) => startDrag(e, text.id)}
-                            className={`absolute cursor-move transition-colors ${activeLayerId === text.id ? 'border-dashed border-2 border-orange-500/80 z-50' : 'border-transparent hover:border-white/20 z-10'}`}
-                            style={{
-                                left: `${text.x}%`, top: `${text.y}%`,
-                                width: 'auto', maxWidth: '90%', minWidth: '50px',
-                                transform: 'translate(0, -50%)'
-                            }}
-                        >
-                            {/* Mobile-Friendly Touch Handle */}
-                            {activeLayerId === text.id && <div className="absolute -top-6 -right-6 bg-orange-500 text-white p-2.5 rounded-full shadow-lg scale-90 md:scale-100 pointer-events-none"><Move className="w-4 h-4"/></div>}
-                        </div>
-                    ))}
+                    {/* Text Layers (Hit Boxes) */}
+                    {(activePage.texts || []).map(text => {
+                        const cleanFont = text.font.replace(/"/g, "'");
+                        // Calculate transformation based on alignment to match Canvas (Left, Center, Right)
+                        let transformX = '0';
+                        if (text.align === 'center') transformX = '-50%';
+                        if (text.align === 'right') transformX = '-100%';
+
+                        return (
+                            <div key={text.id}
+                                onMouseDown={(e) => startDrag(e, text.id)}
+                                onTouchStart={(e) => startDrag(e, text.id)}
+                                className={`absolute cursor-move transition-colors ${activeLayerId === text.id ? 'border-dashed border-2 border-orange-500/80 z-50' : 'border-transparent hover:border-white/20 z-10'}`}
+                                style={{
+                                    left: `${text.x}%`, top: `${text.y}%`,
+                                    transform: `translate(${transformX}, 0)`, // Removed -50% Y translation to match Canvas 'top' baseline
+                                    minWidth: '50px', 
+                                    padding: text.bg !== 'transparent' ? '8px 16px' : '0px' // Match visual padding
+                                }}
+                            >
+                                {/* Invisible Text to give the div shape/hit-box */}
+                                <div style={{
+                                    fontFamily: cleanFont,
+                                    fontSize: `${text.size}px`,
+                                    fontWeight: text.weight,
+                                    letterSpacing: `${text.spacing}px`,
+                                    lineHeight: text.lineHeight,
+                                    color: 'transparent', // Invisible
+                                    userSelect: 'none',
+                                    whiteSpace: 'nowrap',
+                                    pointerEvents: 'none'
+                                }}>
+                                    {text.uppercase ? text.content.toUpperCase() : text.content}
+                                </div>
+
+                                {/* Touch Handle */}
+                                {activeLayerId === text.id && <div className="absolute -top-6 -right-6 bg-orange-500 text-white p-2.5 rounded-full shadow-lg scale-90 md:scale-100 pointer-events-none"><Move className="w-4 h-4"/></div>}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>
 
-        {/* --- CONTROL DECK (Bottom on Mobile, Left on Desktop) --- */}
-        {/* Mobile: Flex-1 (fills remaining 60%). Desktop: Fixed Width */}
+        {/* --- CONTROL DECK --- */}
         <div className="flex-1 md:w-96 md:flex-none bg-[#0a0a0a] md:border-r border-white/10 flex flex-col z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] md:shadow-none md:h-full">
             
             {/* Desktop Header */}
@@ -604,7 +809,7 @@ export default function StoryBuilder() {
                                 <button onClick={addTextLayer} className="bg-white/10 hover:bg-white/20 text-orange-500 p-1.5 rounded transition-colors"><Plus className="w-4 h-4"/></button>
                             </div>
                             <div className="space-y-2">
-                                {activePage.texts.map(text => (
+                                {(activePage.texts || []).map(text => (
                                     <div key={text.id} 
                                          onClick={() => { setActiveLayerId(text.id); setActiveTab('design'); }} 
                                          className={`p-3 rounded-lg border cursor-pointer flex items-center justify-between group transition-all ${activeLayerId === text.id ? 'bg-[#2a2a2a] border-orange-500/50' : 'bg-[#1a1a1a] border-white/5 hover:border-white/20'}`}>
