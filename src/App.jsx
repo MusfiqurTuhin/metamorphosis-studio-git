@@ -150,7 +150,9 @@ export default function StoryBuilder() {
          const { width: containerW, height: containerH } = containerRef.current.getBoundingClientRect();
          if (containerW <= 0 || containerH <= 0) return;
 
-         const padding = 40; 
+         // Adjusted padding for mobile to be smaller (10px) vs desktop (40px)
+         const isMobile = window.innerWidth < 768;
+         const padding = isMobile ? 20 : 40; 
          const availableW = Math.max(50, containerW - padding);
          const availableH = Math.max(50, containerH - padding);
         
@@ -659,49 +661,31 @@ export default function StoryBuilder() {
      
      <div className="hidden"><canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} /></div>
 
-     {/* MOBILE HEADER */}
-     <div className="md:hidden h-12 bg-black border-b border-white/10 flex items-center px-4 justify-between shrink-0 z-50">
-        <div className="flex items-center gap-2">
-           <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
-             <Smartphone className="w-3 h-3 text-white" />
-           </div>
-           <h1 className="text-sm font-bold text-white tracking-wide">Studio</h1>
-        </div>
-        <div className="flex items-center gap-3">
-             {isExportingVideo ? (
-                 <div className="bg-gray-800 px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
-                     <Loader2 className="w-3 h-3 animate-spin text-orange-500"/>
-                     <span className="text-xs font-mono">{Math.round(exportProgress)}%</span>
-                 </div>
-             ) : (
-                <button onClick={() => setShowDownloadMenu(!showDownloadMenu)} className="bg-white text-black px-3 py-1.5 rounded-full text-xs font-bold hover:bg-gray-200 flex items-center gap-1">
-                    <Download className="w-3 h-3"/> Export
-                </button>
-             )}
-             {showDownloadMenu && (
-                <div className="absolute right-2 top-14 w-60 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1">
-                    <button onClick={downloadJPG} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><Camera className="w-4 h-4 text-pink-500"/> JPG Snapshot</button>
-                    <div className="h-px bg-gray-800 mx-2 my-1"></div>
-                    <button onClick={() => { setExportScope('current'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><Play className="w-4 h-4 text-blue-500"/> Video (Current Slide)</button>
-                    <button onClick={() => { setExportScope('all'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><FilmIcon className="w-4 h-4 text-purple-500"/> Video (Full Story)</button>
-                    <div className="h-px bg-gray-800 mx-2 my-1"></div>
-                    <button onClick={generateHTML} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><FileCode className="w-4 h-4 text-orange-500"/> HTML Package</button>
-                </div>
-            )}
-        </div>
-     </div>
-
      {/* SPLIT LAYOUT CONTAINER */}
      <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden relative">
         
         {/* --- PREVIEW PANE --- */}
-        <div className="relative w-full h-[40vh] md:h-full md:flex-1 bg-[#121212] flex flex-col items-center justify-center overflow-hidden select-none order-first md:order-last shrink-0 border-b md:border-b-0 md:border-l border-white/10">
+        {/* Height set to 50vh on mobile to balance with controls */}
+        <div className="relative w-full h-[50vh] md:h-full md:flex-1 bg-[#121212] flex flex-col items-center justify-center overflow-hidden select-none order-first md:order-last shrink-0 border-b md:border-b-0 md:border-l border-white/10">
             
-            {/* Desktop Export Button */}
-            <div className="absolute top-6 right-6 z-50 hidden md:block">
-                <button onClick={() => setShowDownloadMenu(!showDownloadMenu)} className="bg-white text-black px-4 py-2 rounded-full text-sm font-bold hover:bg-gray-200 shadow-xl flex items-center gap-2 transition-transform hover:scale-105">
-                    {isExportingVideo ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
-                    <span>Export</span>
+            {/* Universal Floating Export Button (Visible on all screen sizes) */}
+            <div className="absolute top-4 right-4 md:top-6 md:right-6 z-50">
+                <button 
+                    onClick={() => !isExportingVideo && setShowDownloadMenu(!showDownloadMenu)} 
+                    className="bg-white text-black px-4 py-2 rounded-full text-sm font-bold hover:bg-gray-200 shadow-xl flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
+                    disabled={isExportingVideo}
+                >
+                    {isExportingVideo ? (
+                        <>
+                            <Loader2 className="w-4 h-4 animate-spin text-orange-500"/>
+                            <span className="font-mono">{Math.round(exportProgress)}%</span>
+                        </>
+                    ) : (
+                        <>
+                            <Download className="w-4 h-4"/>
+                            <span>Export</span>
+                        </>
+                    )}
                 </button>
                  {showDownloadMenu && (
                     <div className="absolute right-0 top-12 w-60 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1">
@@ -734,7 +718,6 @@ export default function StoryBuilder() {
                     {/* Text Layers (Hit Boxes) */}
                     {(activePage.texts || []).map(text => {
                         const cleanFont = text.font.replace(/"/g, "'");
-                        // Calculate transformation based on alignment to match Canvas (Left, Center, Right)
                         let transformX = '0';
                         if (text.align === 'center') transformX = '-50%';
                         if (text.align === 'right') transformX = '-100%';
@@ -746,27 +729,24 @@ export default function StoryBuilder() {
                                 className={`absolute cursor-move transition-colors ${activeLayerId === text.id ? 'border-dashed border-2 border-orange-500/80 z-50' : 'border-transparent hover:border-white/20 z-10'}`}
                                 style={{
                                     left: `${text.x}%`, top: `${text.y}%`,
-                                    transform: `translate(${transformX}, 0)`, // Removed -50% Y translation to match Canvas 'top' baseline
+                                    transform: `translate(${transformX}, 0)`,
                                     minWidth: '50px', 
-                                    padding: text.bg !== 'transparent' ? '8px 16px' : '0px' // Match visual padding
+                                    padding: text.bg !== 'transparent' ? '8px 16px' : '0px'
                                 }}
                             >
-                                {/* Invisible Text to give the div shape/hit-box */}
                                 <div style={{
                                     fontFamily: cleanFont,
                                     fontSize: `${text.size}px`,
                                     fontWeight: text.weight,
                                     letterSpacing: `${text.spacing}px`,
                                     lineHeight: text.lineHeight,
-                                    color: 'transparent', // Invisible
+                                    color: 'transparent',
                                     userSelect: 'none',
                                     whiteSpace: 'nowrap',
                                     pointerEvents: 'none'
                                 }}>
                                     {text.uppercase ? text.content.toUpperCase() : text.content}
                                 </div>
-
-                                {/* Touch Handle */}
                                 {activeLayerId === text.id && <div className="absolute -top-6 -right-6 bg-orange-500 text-white p-2.5 rounded-full shadow-lg scale-90 md:scale-100 pointer-events-none"><Move className="w-4 h-4"/></div>}
                             </div>
                         );
@@ -776,13 +756,13 @@ export default function StoryBuilder() {
         </div>
 
         {/* --- CONTROL DECK --- */}
-        <div className="flex-1 md:w-96 md:flex-none bg-[#0a0a0a] md:border-r border-white/10 flex flex-col z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] md:shadow-none md:h-full">
+        <div className="flex-1 md:w-96 md:flex-none bg-[#0a0a0a] md:border-r border-white/10 flex flex-col z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] md:shadow-none md:h-full min-h-0">
             
-            {/* Desktop Header */}
-            <div className="hidden md:block p-6 border-b border-white/10 bg-[#0a0a0a]">
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
-                        <Smartphone className="w-4 h-4 text-white" />
+            {/* Universal Header (Visible on all screen sizes now) */}
+            <div className="p-4 md:p-6 border-b border-white/10 bg-[#0a0a0a] shrink-0">
+                <h1 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                        <Smartphone className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" />
                     </div>
                     Metamorphosis
                 </h1>
@@ -849,6 +829,28 @@ export default function StoryBuilder() {
                                  <div className="absolute right-3 top-3.5 pointer-events-none"><Film className="w-4 h-4 text-neutral-500"/></div>
                              </div>
                         </div>
+
+                        <div className="h-px bg-white/10"></div>
+
+                        {/* Global Image Filters (Moved here) */}
+                        <div className="space-y-4 pb-4">
+                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2"><Sun className="w-3 h-3"/> Image Adjustments</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <Sun className="w-3 h-3 text-neutral-500"/> 
+                                    <input type="range" min="50" max="150" value={activePage.filters?.brightness || 100} onChange={(e) => handleNestedChange('filters', 'brightness', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Contrast className="w-3 h-3 text-neutral-500"/> 
+                                    <input type="range" min="50" max="150" value={activePage.filters?.contrast || 100} onChange={(e) => handleNestedChange('filters', 'contrast', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Droplet className="w-3 h-3 text-neutral-500"/> 
+                                    <input type="range" min="0" max="200" value={activePage.filters?.saturate || 100} onChange={(e) => handleNestedChange('filters', 'saturate', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 )}
 
@@ -959,27 +961,6 @@ export default function StoryBuilder() {
                                 <p className="text-sm">Select a layer to edit design</p>
                             </div>
                         )}
-
-                        <div className="h-px bg-white/10"></div>
-                        
-                        {/* Global Image Filters */}
-                        <div className="space-y-4 pb-4">
-                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2"><Sun className="w-3 h-3"/> Image Adjustments</h3>
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <Sun className="w-3 h-3 text-neutral-500"/> 
-                                    <input type="range" min="50" max="150" value={activePage.filters?.brightness || 100} onChange={(e) => handleNestedChange('filters', 'brightness', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <Contrast className="w-3 h-3 text-neutral-500"/> 
-                                    <input type="range" min="50" max="150" value={activePage.filters?.contrast || 100} onChange={(e) => handleNestedChange('filters', 'contrast', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <Droplet className="w-3 h-3 text-neutral-500"/> 
-                                    <input type="range" min="0" max="200" value={activePage.filters?.saturate || 100} onChange={(e) => handleNestedChange('filters', 'saturate', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
             </div>
