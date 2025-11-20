@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp, Music, Volume2, VolumeX, Upload } from 'lucide-react';
 
 // --- AMP Boilerplate ---
 const AMP_BOILERPLATE = `<!DOCTYPE html>
@@ -22,7 +22,7 @@ const AMP_BOILERPLATE = `<!DOCTYPE html>
    </style>
  </head>
  <body>
-   <amp-story standalone title="__TITLE__" publisher="__PUBLISHER__" publisher-logo-src="__LOGO__" poster-portrait-src="__POSTER__">
+   <amp-story standalone title="__TITLE__" publisher="__PUBLISHER__" publisher-logo-src="__LOGO__" poster-portrait-src="__POSTER__" background-audio="__AUDIO__">
      __PAGES__
    </amp-story>
  </body>
@@ -40,6 +40,11 @@ const TEXT_ANIMATIONS = [
  { value: 'none', label: 'None' }, { value: 'fade-up', label: 'Fade Up' },
  { value: 'typewriter', label: 'Typewriter' }, { value: 'slide-in', label: 'Slide In Left' },
  { value: 'scale-up', label: 'Scale Up' },
+];
+
+// Updated to remove stock music, keeping only 'None'
+const STOCK_MUSIC = [
+    { label: 'None', value: '' }
 ];
 
 const FONTS = [
@@ -80,7 +85,9 @@ export default function StoryBuilder() {
    title: 'Metamorphosis & Odoo', publisher: 'Metamorphosis',
    logo: 'https://cdn-icons-png.flaticon.com/512/2965/2965879.png',
    poster: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&q=80',
-   canonical: 'https://www.metamorphosis.com'
+   canonical: 'https://www.metamorphosis.com',
+   audio: '',
+   audioName: '' // To track custom filename
  });
 
  const [resolution, setResolution] = useState(RESOLUTIONS[0]);
@@ -122,6 +129,7 @@ export default function StoryBuilder() {
  const canvasRef = useRef(null);
  const containerRef = useRef(null);
  const previewRef = useRef(null);
+ const audioRef = useRef(null);
  const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
  const loadedImageRef = useRef(null);
  const requestRef = useRef(null);
@@ -172,6 +180,24 @@ export default function StoryBuilder() {
          window.removeEventListener('resize', updateScale);
      };
  }, [resolution]);
+
+ // --- AUDIO PLAYER SYNC ---
+ useEffect(() => {
+    if (audioRef.current) {
+        if (isPlaying && metadata.audio) {
+            // Reset time if it was paused
+            // audioRef.current.currentTime = 0; // Uncomment if you want loop from start every play
+            const playPromise = audioRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("Audio play failed (user interaction needed first):", error);
+                });
+            }
+        } else {
+            audioRef.current.pause();
+        }
+    }
+ }, [isPlaying, metadata.audio]);
 
  // --- IMAGE PRELOADER ---
  // Loads the image into a Ref so we don't create new HTMLImageElements on every render
@@ -236,6 +262,18 @@ export default function StoryBuilder() {
      reader.onloadend = () => updatePage({ image: reader.result });
      reader.readAsDataURL(file);
    }
+ };
+
+ const handleAudioUpload = (e) => {
+     const file = e.target.files[0];
+     if (file) {
+         const url = URL.createObjectURL(file);
+         setMetadata(prev => ({
+             ...prev,
+             audio: url,
+             audioName: file.name
+         }));
+     }
  };
 
  const addTextLayer = () => {
@@ -506,6 +544,33 @@ export default function StoryBuilder() {
      img.onerror = () => resolve({ ...page, imgElement: null }); 
 });
 
+ // Helper to mix audio with canvas stream
+ const getMixedStream = async (canvasStream, audioUrl) => {
+    if (!audioUrl) return canvasStream;
+
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const response = await fetch(audioUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const decodedAudio = await audioCtx.decodeAudioData(arrayBuffer);
+        
+        const dest = audioCtx.createMediaStreamDestination();
+        const source = audioCtx.createBufferSource();
+        source.buffer = decodedAudio;
+        source.connect(dest);
+        source.start(0); // Start playing audio into the stream
+        
+        const audioTrack = dest.stream.getAudioTracks()[0];
+        if (audioTrack) {
+            canvasStream.addTrack(audioTrack);
+        }
+        return canvasStream;
+    } catch (e) {
+        console.error("Failed to mix audio:", e);
+        return canvasStream; // Fallback to silent video
+    }
+ };
+
  const generateVideo = async () => {
      if (!window.MediaRecorder) return alert("Video export not supported in this browser.");
 
@@ -522,8 +587,13 @@ export default function StoryBuilder() {
      const pagesToRender = exportScope === 'current' ? [activePage] : pages;
      const loadedPages = await Promise.all(pagesToRender.map(loadPageImage));
      
-     const stream = canvas.captureStream(30);
+     let stream = canvas.captureStream(30);
      
+     // MIX AUDIO IF SELECTED
+     if (metadata.audio) {
+         stream = await getMixedStream(stream, metadata.audio);
+     }
+
      let mimeType = 'video/webm';
      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
      else if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4'; 
@@ -612,7 +682,8 @@ export default function StoryBuilder() {
         .replace('__PUBLISHER__', metadata.publisher)
         .replace('__LOGO__', metadata.logo)
         .replace('__POSTER__', metadata.poster)
-        .replace('__CANONICAL_URL__', metadata.canonical);
+        .replace('__CANONICAL_URL__', metadata.canonical)
+        .replace('__AUDIO__', metadata.audio || '');
         
      const blob = new Blob([finalHTML], { type: 'text/html' });
      const url = URL.createObjectURL(blob);
@@ -659,7 +730,12 @@ export default function StoryBuilder() {
      {/* Font Injection for Canvas */}
      <link href="https://fonts.googleapis.com/css2?family=Atma:wght@300;400;500;600;700&family=Baloo+Da+2:wght@400;500;600;700;800&family=Galada&family=Hind+Siliguri:wght@300;400;500;600;700&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Mina:wght@400;700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif+Bengali:wght@100..900&family=Oswald:wght@200..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Tiro+Bangla:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet" />
      
-     <div className="hidden"><canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} /></div>
+     {/* HIDDEN ELEMENTS */}
+     <div className="hidden">
+         <canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} />
+         {/* Audio Element for Preview Playback - With crossorigin anonymous */}
+         <audio ref={audioRef} src={metadata.audio} loop crossOrigin="anonymous" />
+     </div>
 
      {/* SPLIT LAYOUT CONTAINER */}
      <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden relative">
@@ -844,10 +920,8 @@ export default function StoryBuilder() {
                              </div>
                         </div>
 
-                        <div className="h-px bg-white/10"></div>
-
                         {/* Global Image Filters (Moved here) */}
-                        <div className="space-y-4 pb-4">
+                        <div className="space-y-4 py-4">
                             <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2"><Sun className="w-3 h-3"/> Image Adjustments</h3>
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3">
@@ -862,6 +936,57 @@ export default function StoryBuilder() {
                                     <Droplet className="w-3 h-3 text-neutral-500"/> 
                                     <input type="range" min="0" max="200" value={activePage.filters?.saturate || 100} onChange={(e) => handleNestedChange('filters', 'saturate', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
                                 </div>
+                            </div>
+                        </div>
+                        
+                        <div className="h-px bg-white/10"></div>
+
+                        {/* Music Selection */}
+                        <div className="space-y-3 pb-4">
+                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2"><Music className="w-3 h-3"/> Background Music</h3>
+                            <div className="space-y-2">
+                                {/* Stock Options */}
+                                {STOCK_MUSIC.map((track) => (
+                                    <div 
+                                        key={track.label} 
+                                        onClick={() => setMetadata(prev => ({...prev, audio: track.value, audioName: ''}))}
+                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex items-center justify-between ${metadata.audio === track.value ? 'bg-[#2a2a2a] border-orange-500' : 'bg-[#1a1a1a] border-white/5 hover:border-white/10'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {metadata.audio === track.value ? <Volume2 className="w-4 h-4 text-orange-500"/> : <Music className="w-4 h-4 text-neutral-600"/>}
+                                            <span className={`text-sm font-medium ${metadata.audio === track.value ? 'text-white' : 'text-neutral-400'}`}>{track.label}</span>
+                                        </div>
+                                        {metadata.audio === track.value && metadata.audio !== '' && (
+                                           <div className="flex gap-1 items-end h-3">
+                                              <div className="w-0.5 h-2 bg-orange-500 animate-pulse"></div>
+                                              <div className="w-0.5 h-3 bg-orange-500 animate-pulse delay-75"></div>
+                                              <div className="w-0.5 h-1.5 bg-orange-500 animate-pulse delay-150"></div>
+                                           </div>
+                                        )}
+                                    </div>
+                                ))}
+                                
+                                {/* Custom Upload Option */}
+                                <div className={`relative p-3 rounded-lg cursor-pointer border border-dashed transition-all flex items-center justify-center group ${metadata.audioName ? 'bg-[#2a2a2a] border-orange-500' : 'bg-[#1a1a1a] border-white/10 hover:border-white/20'}`}>
+                                    <input type="file" accept="audio/*" onChange={handleAudioUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Upload className={`w-4 h-4 ${metadata.audioName ? 'text-orange-500' : 'text-neutral-500'}`}/>
+                                        <span className={`${metadata.audioName ? 'text-white font-medium' : 'text-neutral-500 group-hover:text-neutral-300'}`}>
+                                            {metadata.audioName || 'Upload Custom Audio'}
+                                        </span>
+                                    </div>
+                                    {metadata.audioName && (
+                                         <div className="absolute right-3 flex gap-1 items-end h-3">
+                                            <div className="w-0.5 h-2 bg-orange-500 animate-pulse"></div>
+                                            <div className="w-0.5 h-3 bg-orange-500 animate-pulse delay-75"></div>
+                                            <div className="w-0.5 h-1.5 bg-orange-500 animate-pulse delay-150"></div>
+                                        </div>
+                                    )}
+                                </div>
+
+                            </div>
+                            <div className="text-[10px] text-neutral-500 italic pt-2">
+                                Note: Music will play in preview and be included in video/HTML exports.
                             </div>
                         </div>
 
