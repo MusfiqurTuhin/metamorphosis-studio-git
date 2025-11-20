@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon } from 'lucide-react';
+import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp } from 'lucide-react';
 
 // --- AMP Boilerplate ---
 const AMP_BOILERPLATE = `<!DOCTYPE html>
@@ -142,9 +142,8 @@ export default function StoryBuilder() {
          const { width: containerW, height: containerH } = containerRef.current.getBoundingClientRect();
          if (containerW <= 0 || containerH <= 0) return;
 
-         // Reduced padding for mobile
-         const isMobile = window.innerWidth < 768;
-         const padding = isMobile ? 0 : 32; // No padding on mobile to maximize width
+         // Standardize padding
+         const padding = 20; 
          const availableW = Math.max(50, containerW - padding);
          const availableH = Math.max(50, containerH - padding);
         
@@ -473,184 +472,313 @@ export default function StoryBuilder() {
  }, [activePageIndex, pages, isPlaying, resolution, previewScale]);
 
  return (
-   // Changed Root: min-h-[100dvh] allows scrolling, removed fixed height lock on mobile
-   <div className="flex flex-col md:flex-row md:h-[100dvh] min-h-[100dvh] bg-gray-900 text-white overflow-x-hidden font-sans">
+   <div className="flex flex-col md:flex-row h-[100dvh] bg-black text-white overflow-hidden font-sans selection:bg-orange-500/30">
      <div className="hidden"><canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} /></div>
 
-     {/* MOBILE HEADER (Visible only md:hidden) */}
-     <div className="md:hidden h-12 bg-gray-800 border-b border-gray-700 flex items-center px-4 justify-between shrink-0 z-20 sticky top-0">
+     {/* MOBILE HEADER */}
+     <div className="md:hidden h-12 bg-black border-b border-white/10 flex items-center px-4 justify-between shrink-0 z-50">
         <div className="flex items-center gap-2">
-           <Smartphone className="w-5 h-5 text-orange-500" /> 
-           <h1 className="text-sm font-bold text-white tracking-wide">Metamorphosis</h1>
+           <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+             <Smartphone className="w-3 h-3 text-white" />
+           </div>
+           <h1 className="text-sm font-bold text-white tracking-wide">Studio</h1>
         </div>
-        <div className="flex items-center gap-2">
-            <button onClick={() => setShowDownloadMenu(!showDownloadMenu)} className="bg-gray-700 p-2 rounded-full text-gray-300 hover:text-white relative">
-                {isExportingVideo ? <Loader2 className="w-4 h-4 animate-spin text-orange-500"/> : <Download className="w-4 h-4"/>}
-            </button>
+        <div className="flex items-center gap-3">
+             {isExportingVideo ? (
+                 <div className="bg-gray-800 px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
+                     <Loader2 className="w-3 h-3 animate-spin text-orange-500"/>
+                     <span className="text-xs font-mono">{Math.round(exportProgress)}%</span>
+                 </div>
+             ) : (
+                <button onClick={() => setShowDownloadMenu(!showDownloadMenu)} className="bg-white text-black px-3 py-1.5 rounded-full text-xs font-bold hover:bg-gray-200 flex items-center gap-1">
+                    <Download className="w-3 h-3"/> Export
+                </button>
+             )}
              {showDownloadMenu && (
-                <div className="absolute right-2 top-14 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 z-50">
-                    <button onClick={downloadJPG} className="w-full text-left p-3 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><Camera className="w-4 h-4 flex-shrink-0 text-pink-500"/> JPG Image</button>
-                    <button onClick={() => { setExportScope('current'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><Play className="w-4 h-4 flex-shrink-0 text-blue-500"/> Video (This Slide)</button>
-                    <button onClick={() => { setExportScope('all'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><FilmIcon className="w-4 h-4 flex-shrink-0 text-purple-500"/> Video (Full Story)</button>
-                    <button onClick={generateHTML} className="w-full text-left p-3 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><FileCode className="w-4 h-4 flex-shrink-0 text-orange-500"/> HTML Story</button>
+                <div className="absolute right-2 top-14 w-60 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1">
+                    <button onClick={downloadJPG} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><Camera className="w-4 h-4 text-pink-500"/> JPG Snapshot</button>
+                    <div className="h-px bg-gray-800 mx-2 my-1"></div>
+                    <button onClick={() => { setExportScope('current'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><Play className="w-4 h-4 text-blue-500"/> Video (Current Slide)</button>
+                    <button onClick={() => { setExportScope('all'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><FilmIcon className="w-4 h-4 text-purple-500"/> Video (Full Story)</button>
+                    <div className="h-px bg-gray-800 mx-2 my-1"></div>
+                    <button onClick={generateHTML} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><FileCode className="w-4 h-4 text-orange-500"/> HTML Package</button>
                 </div>
             )}
         </div>
      </div>
 
-     {/* PREVIEW - Dynamic Height on Mobile / Desktop Right (flex-1) */}
-     <div className="relative w-full md:h-full md:flex-1 bg-black flex flex-col items-center justify-center overflow-hidden select-none order-first md:order-last shrink-0">
+     {/* SPLIT LAYOUT CONTAINER */}
+     {/* Mobile: Flex Column | Desktop: Flex Row */}
+     <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden relative">
         
-        {/* Desktop-only download button (hidden on mobile) */}
-        <div className="absolute top-6 right-6 z-50 hidden md:block">
-            <button onClick={() => setShowDownloadMenu(!showDownloadMenu)} className="bg-white/10 p-3 rounded-full backdrop-blur-md hover:bg-white/20 text-white transition-all relative">
-                {isExportingVideo ? <Loader2 className="w-5 h-5 animate-spin text-orange-500"/> : <Download className="w-5 h-5"/>}
-            </button>
-            {showDownloadMenu && (
-                <div className="absolute right-0 top-12 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 z-50">
-                    <button onClick={downloadJPG} className="w-full text-left p-2 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><Camera className="w-4 h-4 flex-shrink-0 text-pink-500"/> JPG Image</button>
-                    <button onClick={() => { setExportScope('current'); generateVideo(); }} className="w-full text-left p-2 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><Play className="w-4 h-4 flex-shrink-0 text-blue-500"/> Video (Current Slide)</button>
-                    <button onClick={() => { setExportScope('all'); generateVideo(); }} className="w-full text-left p-2 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><FilmIcon className="w-4 h-4 flex-shrink-0 text-purple-500"/> Video (Full Story)</button>
-                    <button onClick={generateHTML} className="w-full text-left p-2 hover:bg-gray-700 rounded text-sm text-gray-300 flex gap-2 transition-colors items-center"><FileCode className="w-4 h-4 flex-shrink-0 text-orange-500"/> HTML Story</button>
+        {/* --- PREVIEW PANE (Top on Mobile, Right on Desktop) --- */}
+        {/* Mobile: Fixed 40% height, flexible content. Desktop: Flex-1 */}
+        <div className="relative w-full h-[40vh] md:h-full md:flex-1 bg-[#121212] flex flex-col items-center justify-center overflow-hidden select-none order-first md:order-last shrink-0 border-b md:border-b-0 md:border-l border-white/10">
+            
+            {/* Desktop Export Button */}
+            <div className="absolute top-6 right-6 z-50 hidden md:block">
+                <button onClick={() => setShowDownloadMenu(!showDownloadMenu)} className="bg-white text-black px-4 py-2 rounded-full text-sm font-bold hover:bg-gray-200 shadow-xl flex items-center gap-2 transition-transform hover:scale-105">
+                    {isExportingVideo ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
+                    <span>Export</span>
+                </button>
+                 {showDownloadMenu && (
+                    <div className="absolute right-0 top-12 w-60 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1">
+                        <button onClick={downloadJPG} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><Camera className="w-4 h-4 text-pink-500"/> JPG Snapshot</button>
+                        <div className="h-px bg-gray-800 mx-2 my-1"></div>
+                        <button onClick={() => { setExportScope('current'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><Play className="w-4 h-4 text-blue-500"/> Video (Current Slide)</button>
+                        <button onClick={() => { setExportScope('all'); generateVideo(); }} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><FilmIcon className="w-4 h-4 text-purple-500"/> Video (Full Story)</button>
+                        <div className="h-px bg-gray-800 mx-2 my-1"></div>
+                        <button onClick={generateHTML} className="w-full text-left p-3 hover:bg-gray-800 rounded-lg text-sm text-gray-200 flex gap-3 transition-colors items-center"><FileCode className="w-4 h-4 text-orange-500"/> HTML Package</button>
+                    </div>
+                )}
+            </div>
+
+            {/* Playback Controls Overlay */}
+            <div className="absolute bottom-4 flex items-center gap-3 md:gap-4 z-40 pointer-events-auto bg-black/60 backdrop-blur-md p-1.5 px-3 rounded-full border border-white/10 shadow-xl">
+                <button onClick={() => setActivePageIndex(Math.max(0, activePageIndex-1))} className="p-1.5 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft className="text-white w-4 h-4 md:w-5 md:h-5"/></button>
+                <button onClick={() => setIsPlaying(!isPlaying)} className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${isPlaying?'bg-white text-black':'bg-orange-500 text-white'} shadow-lg transform active:scale-95 transition-all`}>{isPlaying?<Pause fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"/>:<Play fill="currentColor" className="w-3 h-3 md:w-4 md:h-4 ml-0.5"/>}</button>
+                <div className="flex gap-1.5 px-1 h-2 items-center">{pages.map((_,i)=><div key={i} onClick={()=>setActivePageIndex(i)} className={`rounded-full cursor-pointer transition-all ${i===activePageIndex?'bg-white w-2 h-2 md:w-2.5 md:h-2.5':'bg-white/30 w-1.5 h-1.5 md:w-2 md:h-2'}`}/>)}<button onClick={addNewPage} className="w-4 h-4 md:w-5 md:h-5 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-[10px] font-bold active:scale-95 transition-transform">+</button></div>
+                <button onClick={() => setActivePageIndex(Math.min(pages.length-1, activePageIndex+1))} className="p-1.5 hover:bg-white/10 rounded-full transition-colors"><ChevronRight className="text-white w-4 h-4 md:w-5 md:h-5"/></button>
+            </div>
+
+            {/* Canvas Container - Fits in the 40vh perfectly */}
+            <div ref={containerRef} className="w-full h-full flex items-center justify-center relative p-4">
+                <div ref={previewRef} className="relative shadow-2xl"
+                    style={{ width: resolution.width, height: resolution.height, transform: `scale(${previewScale})`, transformOrigin: 'center center' }}
+                    onMouseDown={(e) => startDrag(e, 'image')}
+                    onTouchStart={(e) => startDrag(e, 'image')}>
+                    <canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} className="w-full h-full block bg-[#1a1a1a]" />
+                    
+                    {/* Text Layers */}
+                    {activePage.texts.map(text => (
+                        <div key={text.id}
+                            onMouseDown={(e) => startDrag(e, text.id)}
+                            onTouchStart={(e) => startDrag(e, text.id)}
+                            className={`absolute cursor-move transition-colors ${activeLayerId === text.id ? 'border-dashed border-2 border-orange-500/80 z-50' : 'border-transparent hover:border-white/20 z-10'}`}
+                            style={{
+                                left: `${text.x}%`, top: `${text.y}%`,
+                                width: 'auto', maxWidth: '90%', minWidth: '50px',
+                                transform: 'translate(0, -50%)'
+                            }}
+                        >
+                            {/* Mobile-Friendly Touch Handle */}
+                            {activeLayerId === text.id && <div className="absolute -top-6 -right-6 bg-orange-500 text-white p-2.5 rounded-full shadow-lg scale-90 md:scale-100 pointer-events-none"><Move className="w-4 h-4"/></div>}
+                        </div>
+                    ))}
                 </div>
-            )}
-        </div>
-
-        {/* Floating Controls (Inside Preview for Space Saving) */}
-        <div className="absolute bottom-4 flex items-center gap-3 md:gap-4 z-40 pointer-events-auto bg-black/50 backdrop-blur-sm p-1.5 rounded-full border border-white/10">
-           <button onClick={() => setActivePageIndex(Math.max(0, activePageIndex-1))} className="p-1.5 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft className="text-white w-5 h-5"/></button>
-           <button onClick={() => setIsPlaying(!isPlaying)} className={`p-2 rounded-full ${isPlaying?'bg-red-500':'bg-green-500'} text-white shadow-lg transform active:scale-95 transition-all`}>{isPlaying?<Pause fill="currentColor" className="w-4 h-4"/>:<Play fill="currentColor" className="w-4 h-4 ml-0.5"/>}</button>
-           <div className="flex gap-1.5 px-1">{pages.map((_,i)=><div key={i} onClick={()=>setActivePageIndex(i)} className={`rounded-full cursor-pointer transition-all ${i===activePageIndex?'bg-orange-500 w-3 h-3':'bg-gray-500 w-2 h-2'}`}/>)}<button onClick={addNewPage} className="w-4 h-4 bg-white text-black rounded-full flex items-center justify-center text-[10px] font-bold active:scale-95 transition-transform">+</button></div>
-           <button onClick={() => setActivePageIndex(Math.min(pages.length-1, activePageIndex+1))} className="p-1.5 hover:bg-white/10 rounded-full transition-colors"><ChevronRight className="text-white w-5 h-5"/></button>
-        </div>
-
-        {/* Container Logic Change: 
-            On Desktop: h-full (flex expand)
-            On Mobile: aspect-ratio based on resolution. This forces the div to take the correct height naturally.
-        */}
-        <div ref={containerRef} 
-             className="w-full flex items-center justify-center bg-neutral-950 relative"
-             style={{ 
-                 height: window.innerWidth < 768 ? 'auto' : '100%', 
-                 aspectRatio: window.innerWidth < 768 ? `${resolution.width}/${resolution.height}` : 'auto' 
-             }}
-        >
-            <div ref={previewRef} className="relative shadow-2xl"
-                 style={{ width: resolution.width, height: resolution.height, transform: `scale(${previewScale})`, transformOrigin: 'center center' }}
-                 onMouseDown={(e) => startDrag(e, 'image')}
-                 onTouchStart={(e) => startDrag(e, 'image')}>
-                 <canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} className="w-full h-full block bg-black" />
-                
-                 {/* Text Hit Areas */}
-                 {activePage.texts.map(text => (
-                     <div key={text.id}
-                          onMouseDown={(e) => startDrag(e, text.id)}
-                          onTouchStart={(e) => startDrag(e, text.id)}
-                          className={`absolute cursor-move transition-colors ${activeLayerId === text.id ? 'border-dashed border-2 border-orange-500/70' : 'border-transparent'}`}
-                          style={{
-                              left: `${text.x}%`, top: `${text.y}%`,
-                              width: '80%', height: 'auto', minHeight: '60px',
-                              transform: 'translate(0, -50%)'
-                          }}
-                     >
-                         {/* Handle */}
-                         {activeLayerId === text.id && <div className="absolute -top-4 -right-4 bg-orange-500 text-white p-2 rounded-full shadow-lg scale-75 md:scale-100"><Move className="w-4 h-4"/></div>}
-                     </div>
-                 ))}
             </div>
         </div>
-     </div>
 
-     {/* SIDEBAR / CONTROLS - Mobile Bottom (Natural Flow) / Desktop Left */}
-     <div className="w-full md:w-96 bg-gray-800 border-t md:border-t-0 md:border-r border-gray-700 flex flex-col z-30 order-last md:order-first md:h-full md:overflow-hidden shadow-[0_-4px_20px_rgba(0,0,0,0.3)] md:shadow-none">
-         
-         {/* Desktop Header (Hidden on mobile) */}
-         <div className="hidden md:block p-5 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
-           <div className="flex justify-between items-center mb-1">
-               <h1 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-pink-500 to-violet-600 flex items-center gap-2 min-w-0">
-                   <Smartphone className="w-5 h-5 text-orange-500 flex-shrink-0" /> <span className="truncate">Metamorphosis Studio</span>
-               </h1>
-           </div>
-           <div className="flex items-center gap-2"><span className="text-[10px] uppercase font-bold tracking-widest bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">AMP Story Maker</span></div>
-         </div>
-
-         <div className="flex border-b border-gray-700 bg-gray-750 gap-1 px-1 shrink-0">
-            <button onClick={() => setActiveTab('content')} className={`flex-1 py-3 md:py-3 text-sm font-medium transition-colors rounded-t ${activeTab==='content'?'bg-gray-700 text-orange-400 border-b-2 border-orange-500':'text-gray-400 hover:text-gray-300'}`}>Content</button>
-            <button onClick={() => setActiveTab('design')} className={`flex-1 py-3 md:py-3 text-sm font-medium transition-colors rounded-t ${activeTab==='design'?'bg-gray-700 text-violet-400 border-b-2 border-violet-500':'text-gray-400 hover:text-gray-300'}`}>Design</button>
-         </div>
-        
-         {/* Mobile: Natural height (no overflow-y-auto on parent), Desktop: overflow-y-auto */}
-         <div className="flex-grow md:overflow-y-auto p-4 md:p-6 space-y-5 md:space-y-6 custom-scrollbar pb-20 md:pb-8 bg-gray-800/50">
-            {activeTab === 'content' && (
-               <>
-                  <div className="space-y-3">
-                      <div className="flex justify-between text-sm text-gray-400 font-bold"><span>Layers</span><button onClick={addTextLayer} className="text-orange-400 hover:text-orange-300 hover:bg-orange-400/10 rounded p-1"><Plus className="w-4 h-4"/></button></div>
-                      {activePage.texts.map(text => (
-                          <div key={text.id} onClick={() => { setActiveLayerId(text.id); setActiveTab('design'); }} className={`p-3 md:p-3 rounded border cursor-pointer flex justify-between group text-sm transition-all ${activeLayerId === text.id ? 'bg-gray-700 border-orange-500 shadow-lg' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}>
-                             <span className="truncate flex-1 font-medium">{text.content}</span>
-                             <button onClick={(e) => { e.stopPropagation(); deleteLayer(text.id); }} className="text-gray-500 hover:text-red-400 ml-2 flex-shrink-0 px-2"><Trash2 className="w-4 h-4"/></button>
-                          </div>
-                      ))}
-                  </div>
-                 
-                  <div className="space-y-2 mt-4 border-t border-gray-700 pt-4">
-                     <label className="text-xs font-bold text-gray-400 uppercase block">Background Image</label>
-                     <div className="relative group rounded-lg overflow-hidden border border-gray-600 aspect-video bg-gray-900 shadow-inner">
-                       <img src={activePage.image} className="w-full h-full object-cover" alt="Preview"/>
-                       <label className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                         <ImageIcon className="w-8 h-8 mb-2 text-gray-300" /><span className="text-xs font-bold text-white bg-gray-700 px-3 py-1 rounded">Change Image</span>
-                         <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                       </label>
-                     </div>
-                  </div>
-                  <div className="border-t border-gray-700 pt-4"><label className="text-xs font-bold text-gray-400 uppercase mb-3 flex gap-2"><Film className="w-3 h-3" /> Page Animation</label><select value={activePage.bgAnimation} onChange={(e) => updatePage({bgAnimation: e.target.value})} className="w-full bg-gray-700 border-gray-600 rounded p-3 text-sm text-white">{ANIMATIONS.map(a=><option key={a.value} value={a.value}>{a.label}</option>)}</select></div>
-               </>
-            )}
-
-            {activeTab === 'design' && activeLayer && (
-                <div className="space-y-6">
-                    <div className="border-b border-gray-700 pb-4">
-                       <label className="flex text-xs md:text-sm mb-2 text-orange-400 font-semibold items-center gap-1 uppercase">
-                           <Monitor className="w-3 h-3" /> Canvas Size
-                       </label>
-                       <select value={resolution.label} onChange={handleResolutionChange} className="w-full bg-gray-700 border border-gray-600 rounded p-3 md:p-2.5 text-sm md:text-sm text-white outline-none focus:border-orange-500 transition-colors">
-                           {RESOLUTIONS.map((res, i) => <option key={i} value={res.label}>{res.label}</option>)}
-                       </select>
+        {/* --- CONTROL DECK (Bottom on Mobile, Left on Desktop) --- */}
+        {/* Mobile: Flex-1 (fills remaining 60%). Desktop: Fixed Width */}
+        <div className="flex-1 md:w-96 md:flex-none bg-[#0a0a0a] md:border-r border-white/10 flex flex-col z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] md:shadow-none md:h-full">
+            
+            {/* Desktop Header */}
+            <div className="hidden md:block p-6 border-b border-white/10 bg-[#0a0a0a]">
+                <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                        <Smartphone className="w-4 h-4 text-white" />
                     </div>
-                    {activeLayer ? (
-                      <>
-                        <div><label className="text-xs md:text-sm font-bold text-gray-500 uppercase mb-2 block">Text Content</label><textarea value={activeLayer.content} onChange={(e) => updateTextLayer(activeLayerId, 'content', e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded p-3 text-base text-white h-24 resize-none focus:border-orange-500 outline-none transition-colors" /></div>
-                        <div className="space-y-4 border-t border-gray-700 pt-4"><label className="text-xs font-bold text-orange-400 uppercase">Typography</label><div className="grid grid-cols-2 gap-3"><select value={activeLayer.font} onChange={(e) => updateTextLayer(activeLayerId, 'font', e.target.value)} className="col-span-2 w-full bg-gray-700 border-gray-600 rounded p-3 text-sm">{FONTS.map(f=><option key={f.value} value={f.value}>{f.label}</option>)}</select><div className="flex items-center gap-2"><TypeIcon className="w-4 h-4 text-gray-500"/><input type="number" value={activeLayer.size} onChange={(e) => updateTextLayer(activeLayerId, 'size', parseInt(e.target.value))} className="w-full bg-gray-700 border-gray-600 rounded p-3 text-base" /></div><div className="flex items-center gap-2"><Bold className="w-4 h-4 text-gray-500"/><select value={activeLayer.weight} onChange={(e) => updateTextLayer(activeLayerId, 'weight', e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded p-3 text-sm"><option value="400">Normal</option><option value="700">Bold</option><option value="900">Heavy</option></select></div></div><div className="flex gap-2"><button onClick={() => updateTextLayer(activeLayerId, 'italic', !activeLayer.italic)} className={`p-3 rounded flex-1 ${activeLayer.italic?'bg-orange-500 text-white':'bg-gray-700 text-gray-400'}`}><Italic className="w-4 h-4 mx-auto"/></button><button onClick={() => updateTextLayer(activeLayerId, 'uppercase', !activeLayer.uppercase)} className={`p-3 rounded flex-1 ${activeLayer.uppercase?'bg-orange-500 text-white':'bg-gray-700 text-gray-400'}`}><TypeIcon className="w-4 h-4 mx-auto"/></button><div className="flex bg-gray-700 rounded p-1 flex-[2]">{['left','center','right'].map(a=><button key={a} onClick={()=>updateTextLayer(activeLayerId,'align',a)} className={`flex-1 rounded p-2 ${activeLayer.align===a?'bg-gray-600 text-white':'text-gray-400'}`}>{a==='left'?<AlignLeft className="w-4 h-4 mx-auto"/>:a==='center'?<AlignCenter className="w-4 h-4 mx-auto"/>:<AlignRight className="w-4 h-4 mx-auto"/>}</button>)}</div></div></div>
-                        <div className="space-y-4 border-t border-gray-700 pt-4">
-                           <label className="text-xs font-bold text-purple-400 uppercase">Appearance</label>
-                           <div className="flex gap-4">
-                               <div className="flex-1"><label className="text-xs text-gray-500 mb-1 block">Text Color</label><div className="flex items-center bg-gray-700 rounded p-1 h-10"><input type="color" value={activeLayer.color} onChange={(e) => updateTextLayer(activeLayerId, 'color', e.target.value)} className="w-full h-full rounded bg-transparent border-none"/></div></div>
-                               <div className="flex-1">
-                                   <label className="text-xs text-gray-500 mb-1 block">Background</label>
-                                   <div className="flex items-center bg-gray-700 rounded p-1 gap-2 h-10">
-                                       {activeLayer.bg !== 'transparent' ? (
-                                           <>
-                                               <input type="color" value={activeLayer.bg} onChange={(e) => updateTextLayer(activeLayerId, 'bg', e.target.value)} className="flex-1 h-full rounded bg-transparent border-none cursor-pointer" />
-                                               <button onClick={() => updateTextLayer(activeLayerId, 'bg', 'transparent')} className="text-gray-400 hover:text-red-400 p-2"><X className="w-4 h-4" /></button>
-                                           </>
-                                       ) : (
-                                           <button onClick={() => updateTextLayer(activeLayerId, 'bg', '#ffffff')} className="w-full h-full flex items-center justify-center text-xs text-gray-400 hover:text-white border border-dashed border-gray-500 hover:border-gray-300 rounded">No Fill</button>
-                                       )}
-                                   </div>
-                               </div>
-                           </div>
-                           <div><label className="text-xs text-gray-500 mb-1 block">Opacity</label><input type="range" min="0" max="1" step="0.1" value={activeLayer.opacity} onChange={(e)=>updateTextLayer(activeLayerId, 'opacity', parseFloat(e.target.value))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none accent-purple-500"/></div>
-                           {activeLayer.bg !== 'transparent' && (<div><label className="text-xs text-gray-500 mb-1 block">Corner Radius: {activeLayer.radius}px</label><input type="range" min="0" max="50" value={activeLayer.radius} onChange={(e)=>updateTextLayer(activeLayerId, 'radius', parseInt(e.target.value))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none accent-purple-500"/></div>)}
-                        </div>
-                        <div className="space-y-4 border-t border-gray-700 pt-4"><label className="text-xs font-bold text-blue-400 uppercase">Text Motion</label><select value={activeLayer.animation} onChange={(e) => updateTextLayer(activeLayerId, 'animation', e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded p-3 text-sm text-white">{TEXT_ANIMATIONS.map(a=><option key={a.value} value={a.value}>{a.label}</option>)}</select></div>
-                      </>
-                    ) : <div className="text-gray-500 text-center py-10 text-sm">Select a text layer to edit</div>}
-                   
-                    <div className="border-t border-gray-700 pt-4"><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Sun className="w-3 h-3" /> Image Adjustments</label><div className="space-y-3"><div className="flex items-center gap-2 text-xs text-gray-400"><Sun className="w-3 h-3"/> Brightness <input type="range" min="50" max="150" value={activePage.filters?.brightness || 100} onChange={(e) => handleNestedChange('filters', 'brightness', e.target.value)} className="flex-1 h-2 bg-gray-600 rounded-lg appearance-none accent-yellow-500"/></div><div className="flex items-center gap-2 text-xs text-gray-400"><Contrast className="w-3 h-3"/> Contrast <input type="range" min="50" max="150" value={activePage.filters?.contrast || 100} onChange={(e) => handleNestedChange('filters', 'contrast', e.target.value)} className="flex-1 h-2 bg-gray-600 rounded-lg appearance-none accent-yellow-500"/></div><div className="flex items-center gap-2 text-xs text-gray-400"><Droplet className="w-3 h-3"/> Saturate <input type="range" min="0" max="200" value={activePage.filters?.saturate || 100} onChange={(e) => handleNestedChange('filters', 'saturate', e.target.value)} className="flex-1 h-2 bg-gray-600 rounded-lg appearance-none accent-yellow-500"/></div></div></div>
-                    <div className="border-t border-gray-700 pt-4 pb-4"><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"><ArrowUp className="w-3 h-3" /> Background Overlay</label><div className="flex gap-4 items-start flex-col md:flex-row"><div className="flex items-center gap-3 w-full"><input type="color" value={activePage.overlay?.color || '#000000'} onChange={(e) => handleNestedChange('overlay', 'color', e.target.value)} className="h-10 w-10 rounded bg-transparent border-none cursor-pointer flex-shrink-0" /><span className="text-sm text-gray-400">Overlay Color</span></div><div className="flex-1 w-full space-y-2"><div className="flex justify-between text-xs text-gray-500"><span>Opacity</span><span>{Math.round((activePage.overlay?.opacity || 0.6)*100)}%</span></div><input type="range" min="0" max="1" step="0.1" value={activePage.overlay?.opacity || 0.6} onChange={(e) => handleNestedChange('overlay', 'opacity', e.target.value)} className="w-full h-2 bg-gray-600 rounded-lg appearance-none accent-pink-500"/></div><div className="flex-1 w-full space-y-2"><div className="flex justify-between text-xs text-gray-500"><span>Height</span><span>{activePage.overlay?.height || 40}%</span></div><input type="range" min="0" max="100" value={activePage.overlay?.height || 40} onChange={(e) => handleNestedChange('overlay', 'height', e.target.value)} className="w-full h-2 bg-gray-600 rounded-lg appearance-none accent-pink-500"/></div></div></div>
+                    Metamorphosis
+                </h1>
+                <div className="mt-2 flex items-center gap-2">
+                     <span className="text-[10px] font-bold tracking-wider uppercase text-white/40 bg-white/5 px-2 py-1 rounded">Story Studio</span>
                 </div>
-            )}
-         </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-white/10 bg-[#0a0a0a] px-2 pt-2 shrink-0 sticky top-0 z-30">
+                <button onClick={() => setActiveTab('content')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all rounded-t-lg border-b-2 ${activeTab==='content'?'bg-[#1a1a1a] text-white border-orange-500':'text-neutral-500 border-transparent hover:text-neutral-300'}`}>Content</button>
+                <button onClick={() => setActiveTab('design')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all rounded-t-lg border-b-2 ${activeTab==='design'?'bg-[#1a1a1a] text-white border-purple-500':'text-neutral-500 border-transparent hover:text-neutral-300'}`}>Design</button>
+            </div>
+            
+            {/* Scrollable Content Area */}
+            <div className="flex-grow overflow-y-auto custom-scrollbar bg-[#121212] p-4 md:p-6 pb-20 md:pb-8">
+                {activeTab === 'content' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        
+                        {/* Layers Panel */}
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Layers</h3>
+                                <button onClick={addTextLayer} className="bg-white/10 hover:bg-white/20 text-orange-500 p-1.5 rounded transition-colors"><Plus className="w-4 h-4"/></button>
+                            </div>
+                            <div className="space-y-2">
+                                {activePage.texts.map(text => (
+                                    <div key={text.id} 
+                                         onClick={() => { setActiveLayerId(text.id); setActiveTab('design'); }} 
+                                         className={`p-3 rounded-lg border cursor-pointer flex items-center justify-between group transition-all ${activeLayerId === text.id ? 'bg-[#2a2a2a] border-orange-500/50' : 'bg-[#1a1a1a] border-white/5 hover:border-white/20'}`}>
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <Type className={`w-4 h-4 flex-shrink-0 ${activeLayerId===text.id?'text-orange-500':'text-neutral-600'}`}/>
+                                            <span className="truncate text-sm font-medium text-gray-300">{text.content}</span>
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); deleteLayer(text.id); }} className="text-neutral-600 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4"/></button>
+                                    </div>
+                                ))}
+                                {activePage.texts.length === 0 && <div className="text-center py-8 text-neutral-600 text-sm border border-dashed border-white/10 rounded-lg">No text layers. Click + to add.</div>}
+                            </div>
+                        </div>
+                        
+                        <div className="h-px bg-white/10"></div>
+
+                        {/* Background Image */}
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Background</h3>
+                            <div className="relative group rounded-xl overflow-hidden border border-white/10 bg-[#1a1a1a] aspect-video shadow-lg">
+                                <img src={activePage.image} className="w-full h-full object-cover opacity-80 group-hover:opacity-40 transition-opacity" alt="Preview"/>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ImageIcon className="w-8 h-8 mb-2 text-white/80" />
+                                    <span className="text-xs font-bold text-white bg-black/50 px-3 py-1 rounded-full backdrop-blur-sm border border-white/20">Change Image</span>
+                                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Page Settings */}
+                        <div className="space-y-3">
+                             <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Animation</h3>
+                             <div className="relative">
+                                 <select value={activePage.bgAnimation} onChange={(e) => updatePage({bgAnimation: e.target.value})} className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-sm text-white appearance-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none">
+                                     {ANIMATIONS.map(a=><option key={a.value} value={a.value}>{a.label}</option>)}
+                                 </select>
+                                 <div className="absolute right-3 top-3.5 pointer-events-none"><Film className="w-4 h-4 text-neutral-500"/></div>
+                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'design' && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                         {/* Canvas Size Selector */}
+                        <div className="space-y-3">
+                             <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2"><Monitor className="w-3 h-3"/> Canvas</h3>
+                             <select value={resolution.label} onChange={handleResolutionChange} className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-orange-500 outline-none">
+                                {RESOLUTIONS.map((res, i) => <option key={i} value={res.label}>{res.label}</option>)}
+                            </select>
+                        </div>
+
+                        {activeLayer ? (
+                            <>
+                                {/* Content Editor */}
+                                <div className="space-y-3">
+                                     <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Text Content</h3>
+                                     <textarea value={activeLayer.content} onChange={(e) => updateTextLayer(activeLayerId, 'content', e.target.value)} className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl p-4 text-base text-white min-h-[100px] resize-none focus:border-orange-500 outline-none transition-colors shadow-inner" placeholder="Type something..." />
+                                </div>
+
+                                <div className="h-px bg-white/10"></div>
+
+                                {/* Typography */}
+                                <div className="space-y-4">
+                                    <h3 className="text-xs font-bold text-orange-500 uppercase tracking-wider">Typography</h3>
+                                    
+                                    <div className="grid grid-cols-1 gap-3">
+                                        <select value={activeLayer.font} onChange={(e) => updateTextLayer(activeLayerId, 'font', e.target.value)} className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-orange-500 outline-none">
+                                            {FONTS.map(f=><option key={f.value} value={f.value}>{f.label}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex items-center bg-[#1a1a1a] border border-white/10 rounded-lg px-3 h-10">
+                                            <TypeIcon className="w-4 h-4 text-neutral-500 mr-2"/>
+                                            <input type="number" value={activeLayer.size} onChange={(e) => updateTextLayer(activeLayerId, 'size', parseInt(e.target.value))} className="w-full bg-transparent border-none text-white text-sm focus:ring-0 p-0" />
+                                        </div>
+                                        <div className="flex items-center bg-[#1a1a1a] border border-white/10 rounded-lg px-3 h-10">
+                                            <Bold className="w-4 h-4 text-neutral-500 mr-2"/>
+                                            <select value={activeLayer.weight} onChange={(e) => updateTextLayer(activeLayerId, 'weight', e.target.value)} className="w-full bg-transparent border-none text-white text-sm focus:ring-0 p-0">
+                                                <option value="400">Regular</option><option value="700">Bold</option><option value="900">Heavy</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 bg-[#1a1a1a] p-1 rounded-lg border border-white/10">
+                                        <button onClick={() => updateTextLayer(activeLayerId, 'italic', !activeLayer.italic)} className={`flex-1 p-2 rounded-md transition-colors ${activeLayer.italic?'bg-orange-500 text-white':'text-neutral-500 hover:text-white'}`}><Italic className="w-4 h-4 mx-auto"/></button>
+                                        <button onClick={() => updateTextLayer(activeLayerId, 'uppercase', !activeLayer.uppercase)} className={`flex-1 p-2 rounded-md transition-colors ${activeLayer.uppercase?'bg-orange-500 text-white':'text-neutral-500 hover:text-white'}`}><TypeIcon className="w-4 h-4 mx-auto"/></button>
+                                        <div className="w-px bg-white/10 mx-1"></div>
+                                        {['left','center','right'].map(a=><button key={a} onClick={()=>updateTextLayer(activeLayerId,'align',a)} className={`flex-1 p-2 rounded-md transition-colors ${activeLayer.align===a?'bg-white/10 text-white':'text-neutral-500'}`}>{a==='left'?<AlignLeft className="w-4 h-4 mx-auto"/>:a==='center'?<AlignCenter className="w-4 h-4 mx-auto"/>:<AlignRight className="w-4 h-4 mx-auto"/>}</button>)}
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-white/10"></div>
+
+                                {/* Colors & Style */}
+                                <div className="space-y-4">
+                                   <h3 className="text-xs font-bold text-purple-500 uppercase tracking-wider">Colors</h3>
+                                   <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500 uppercase mb-1.5 block">Text Color</label>
+                                            <div className="flex items-center bg-[#1a1a1a] border border-white/10 rounded-lg p-1 pr-3">
+                                                <input type="color" value={activeLayer.color} onChange={(e) => updateTextLayer(activeLayerId, 'color', e.target.value)} className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0 mr-2"/>
+                                                <span className="text-xs text-gray-400 font-mono">{activeLayer.color}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500 uppercase mb-1.5 block">Background</label>
+                                            <div className="flex items-center bg-[#1a1a1a] border border-white/10 rounded-lg p-1 pr-2">
+                                                {activeLayer.bg !== 'transparent' ? (
+                                                    <>
+                                                    <input type="color" value={activeLayer.bg} onChange={(e) => updateTextLayer(activeLayerId, 'bg', e.target.value)} className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0 mr-2"/>
+                                                    <button onClick={() => updateTextLayer(activeLayerId, 'bg', 'transparent')} className="ml-auto p-1.5 hover:bg-white/10 rounded-md text-neutral-500 hover:text-white"><X className="w-3 h-3"/></button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={() => updateTextLayer(activeLayerId, 'bg', '#ffffff')} className="w-full h-8 text-xs text-neutral-500 border border-dashed border-white/20 rounded hover:border-white/40 hover:text-white">Add Fill</button>
+                                                )}
+                                            </div>
+                                        </div>
+                                   </div>
+                                   
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex justify-between text-xs text-neutral-500"><span>Opacity</span><span>{Math.round((activeLayer.opacity || 1)*100)}%</span></div>
+                                        <input type="range" min="0" max="1" step="0.1" value={activeLayer.opacity} onChange={(e)=>updateTextLayer(activeLayerId, 'opacity', parseFloat(e.target.value))} className="w-full h-1.5 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-purple-500"/>
+                                        
+                                        {activeLayer.bg !== 'transparent' && (
+                                            <>
+                                            <div className="flex justify-between text-xs text-neutral-500 mt-2"><span>Corner Radius</span><span>{activeLayer.radius}px</span></div>
+                                            <input type="range" min="0" max="50" value={activeLayer.radius} onChange={(e)=>updateTextLayer(activeLayerId, 'radius', parseInt(e.target.value))} className="w-full h-1.5 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-purple-500"/>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-white/10"></div>
+
+                                <div className="space-y-3">
+                                    <h3 className="text-xs font-bold text-blue-500 uppercase tracking-wider">Entrance Animation</h3>
+                                    <select value={activeLayer.animation} onChange={(e) => updateTextLayer(activeLayerId, 'animation', e.target.value)} className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-orange-500 outline-none">
+                                        {TEXT_ANIMATIONS.map(a=><option key={a.value} value={a.value}>{a.label}</option>)}
+                                    </select>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-10 text-neutral-600 border border-dashed border-white/10 rounded-xl bg-[#151515]">
+                                <Move className="w-8 h-8 mb-2 opacity-50"/>
+                                <p className="text-sm">Select a layer to edit design</p>
+                            </div>
+                        )}
+
+                        <div className="h-px bg-white/10"></div>
+                        
+                        {/* Global Image Filters */}
+                        <div className="space-y-4 pb-4">
+                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2"><Sun className="w-3 h-3"/> Image Adjustments</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <Sun className="w-3 h-3 text-neutral-500"/> 
+                                    <input type="range" min="50" max="150" value={activePage.filters?.brightness || 100} onChange={(e) => handleNestedChange('filters', 'brightness', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Contrast className="w-3 h-3 text-neutral-500"/> 
+                                    <input type="range" min="50" max="150" value={activePage.filters?.contrast || 100} onChange={(e) => handleNestedChange('filters', 'contrast', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Droplet className="w-3 h-3 text-neutral-500"/> 
+                                    <input type="range" min="0" max="200" value={activePage.filters?.saturate || 100} onChange={(e) => handleNestedChange('filters', 'saturate', e.target.value)} className="flex-1 h-1.5 bg-[#2a2a2a] rounded-lg appearance-none accent-yellow-500"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
      </div>
    </div>
  );
