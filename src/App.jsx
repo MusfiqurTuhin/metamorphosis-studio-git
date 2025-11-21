@@ -42,9 +42,14 @@ const TEXT_ANIMATIONS = [
  { value: 'scale-up', label: 'Scale Up' },
 ];
 
-// Updated to remove stock music, keeping only 'None'
+// --- UPDATED STOCK MUSIC ---
 const STOCK_MUSIC = [
-    { label: 'None', value: '' }
+ { label: 'None', value: '' },
+ { label: 'Upbeat & Happy', value: 'https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3' },
+ { label: 'Cinematic Dramatic', value: 'https://assets.mixkit.co/music/preview/mixkit-raising-me-higher-34.mp3' },
+ { label: 'Corporate Success', value: 'https://assets.mixkit.co/music/preview/mixkit-driving-ambition-32.mp3' },
+ { label: 'Relaxing Lo-Fi', value: 'https://assets.mixkit.co/music/preview/mixkit-dreaming-big-31.mp3' },
+ { label: 'Deep Urban', value: 'https://assets.mixkit.co/music/preview/mixkit-deep-urban-623.mp3' }
 ];
 
 const FONTS = [
@@ -185,12 +190,11 @@ export default function StoryBuilder() {
  useEffect(() => {
     if (audioRef.current) {
         if (isPlaying && metadata.audio) {
-            // Reset time if it was paused
-            // audioRef.current.currentTime = 0; // Uncomment if you want loop from start every play
+            // Use a promise to handle potential play interruptions or errors
             const playPromise = audioRef.current.play();
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
-                    console.log("Audio play failed (user interaction needed first):", error);
+                    console.warn("Audio play failed (autoplay policy or loading):", error);
                 });
             }
         } else {
@@ -549,9 +553,17 @@ export default function StoryBuilder() {
     if (!audioUrl) return canvasStream;
 
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const response = await fetch(audioUrl);
+        // Check if the fetch was successful
+        if (!response.ok) {
+            console.warn(`Audio fetch failed with status: ${response.status}`);
+            return canvasStream;
+        }
+
         const arrayBuffer = await response.arrayBuffer();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Decode audio data
         const decodedAudio = await audioCtx.decodeAudioData(arrayBuffer);
         
         const dest = audioCtx.createMediaStreamDestination();
@@ -733,8 +745,8 @@ export default function StoryBuilder() {
      {/* HIDDEN ELEMENTS */}
      <div className="hidden">
          <canvas key={resolution.label} ref={canvasRef} width={resolution.width} height={resolution.height} />
-         {/* Audio Element for Preview Playback - With crossorigin anonymous */}
-         <audio ref={audioRef} src={metadata.audio} loop crossOrigin="anonymous" />
+         {/* Audio Element for Preview Playback - KEY prop forces remount on song change */}
+         <audio ref={audioRef} key={metadata.audio} src={metadata.audio} loop crossOrigin="anonymous" />
      </div>
 
      {/* SPLIT LAYOUT CONTAINER */}
