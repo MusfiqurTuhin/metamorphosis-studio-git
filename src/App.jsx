@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp, Music, Volume2, VolumeX, Upload } from 'lucide-react';
 
+// --- IMPORTED LOCAL AUDIO ---
+// These look for files in the SAME directory as this App.jsx file
+import audioBoo from './04 Light Entertainment Audience, Boo.mp3';
+import audioRoom from './09 SCHOOLS, Girls Changing Room - Ge.mp3';
+import audioApplause from './19 Theatre AND Concert Audience, App.mp3';
+import audioChildren from './23 Babies AND Children 8-10 Years, 2.mp3';
+
 // --- AMP Boilerplate ---
 const AMP_BOILERPLATE = `<!DOCTYPE html>
 <html amp lang="en">
@@ -45,6 +52,12 @@ const TEXT_ANIMATIONS = [
 // --- UPDATED STOCK MUSIC ---
 const STOCK_MUSIC = [
  { label: 'None', value: '' },
+ // Local Uploaded Files
+ { label: 'Audience Boo', value: audioBoo },
+ { label: 'Girls Changing Room', value: audioRoom },
+ { label: 'Concert Applause', value: audioApplause },
+ { label: 'Children Playing', value: audioChildren },
+ // External Fallbacks (Optional)
  { label: 'Upbeat & Happy', value: 'https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3' },
  { label: 'Cinematic Dramatic', value: 'https://assets.mixkit.co/music/preview/mixkit-raising-me-higher-34.mp3' },
  { label: 'Corporate Success', value: 'https://assets.mixkit.co/music/preview/mixkit-driving-ambition-32.mp3' },
