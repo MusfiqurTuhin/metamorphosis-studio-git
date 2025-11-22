@@ -482,21 +482,63 @@ export default function StoryBuilder() {
          ctx.textAlign = layer.align; ctx.textBaseline = 'top'; 
          if (layer.spacing > 0) ctx.letterSpacing = `${layer.spacing}px`;
 
-         const metrics = ctx.measureText(displayText);
+         // --- WORD WRAP LOGIC ---
+         const maxWidth = width * 0.85; // Allow 15% padding on sides
+         const words = displayText.split(' ');
+         let lines = [];
+         let currentLine = words[0];
+
+         for (let i = 1; i < words.length; i++) {
+             const word = words[i];
+             const width = ctx.measureText(currentLine + " " + word).width;
+             if (width < maxWidth) {
+                 currentLine += " " + word;
+             } else {
+                 lines.push(currentLine);
+                 currentLine = word;
+             }
+         }
+         lines.push(currentLine);
+         // -----------------------
+
+         const lineHeightPx = layer.size * layer.lineHeight;
+
          if (layer.bg && layer.bg !== 'transparent') {
-             const pW = metrics.width + 40; const pH = layer.size * 1.6;
-             let rectX = x; if (layer.align === 'center') rectX = x - (pW/2); if (layer.align === 'right') rectX = x - pW;
+             // Calculate Box Dimensions based on max line width
+             let maxLineWidth = 0;
+             lines.forEach(l => {
+                 const m = ctx.measureText(l);
+                 if(m.width > maxLineWidth) maxLineWidth = m.width;
+             });
+
+             const pW = maxLineWidth + 40; 
+             const pH = (lines.length * lineHeightPx) + 20;
+             let rectX = x; 
+             if (layer.align === 'center') rectX = x - (pW/2); 
+             if (layer.align === 'right') rectX = x - pW;
+             
              if (layer.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 4; }
              ctx.fillStyle = layer.bg; ctx.beginPath(); 
              if (ctx.roundRect) ctx.roundRect(rectX, y, pW, pH, layer.radius || 0); else ctx.rect(rectX, y, pW, pH);
              ctx.fill();
+             
              ctx.shadowColor = 'transparent'; ctx.fillStyle = layer.color;
-             let textX = rectX + 20; if (layer.align === 'center') textX = rectX + (pW/2); if (layer.align === 'right') textX = rectX + pW - 20;
-             ctx.fillText(displayText, textX, y + (pH - layer.size)/2 + 2);
+             
+             // Draw each line
+             lines.forEach((line, i) => {
+                 let textX = rectX + 20; 
+                 if (layer.align === 'center') textX = rectX + (pW/2); 
+                 if (layer.align === 'right') textX = rectX + pW - 20;
+                 ctx.fillText(line, textX, y + 10 + (i * lineHeightPx));
+             });
+
          } else {
             if (layer.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2; }
             ctx.fillStyle = layer.color;
-            ctx.fillText(displayText, x, y);
+            // Draw each line
+            lines.forEach((line, i) => {
+                ctx.fillText(line, x, y + (i * lineHeightPx));
+            });
          }
          ctx.restore();
      });
