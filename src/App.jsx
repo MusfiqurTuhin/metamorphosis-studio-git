@@ -665,10 +665,14 @@ export default function StoryBuilder() {
             if (!requestRef.current.startTime) requestRef.current.startTime = time;
             let elapsed = time - requestRef.current.startTime;
             
-            // Loop Logic: Reset start time if elapsed > duration to create loop effect
+            // Loop Logic: Switch to NEXT page if duration exceeded
             if (elapsed > duration) {
-                requestRef.current.startTime = time;
-                elapsed = 0;
+                const nextIndex = (activePageIndex + 1) % pages.length;
+                setActivePageIndex(nextIndex);
+                // Return immediately so we don't draw the old frame.
+                // The re-render caused by setActivePageIndex will trigger this effect again,
+                // resetting requestRef and starting the new slide's animation.
+                return; 
             }
 
             drawFrame(ctx, pageData, elapsed / duration);
@@ -686,7 +690,7 @@ export default function StoryBuilder() {
          if (requestRef.current?.id) cancelAnimationFrame(requestRef.current.id);
      }
      return () => { if (requestRef.current?.id) cancelAnimationFrame(requestRef.current.id); };
- }, [activePage, isPlaying, resolution, previewScale]); 
+ }, [activePage, isPlaying, resolution, previewScale, activePageIndex, pages.length]); 
 
  return (
    <div className="flex flex-col md:flex-row h-[100dvh] bg-black text-white overflow-hidden font-sans selection:bg-orange-500/30">
