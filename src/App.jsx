@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp, Music, Volume2, VolumeX, Upload, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp, Music, Volume2, VolumeX, Upload, RefreshCw, Clock } from 'lucide-react';
 
 // --- AUDIO SOURCES (GITHUB RAW) ---
 // These URLs point directly to the files in your GitHub repository. 
@@ -549,8 +549,10 @@ export default function StoryBuilder() {
                  if(m.width > maxLineWidth) maxLineWidth = m.width;
              });
 
-             const pW = maxLineWidth + 40; 
-             const pH = (lines.length * lineHeightPx) + 20;
+             const paddingX = 40;
+             const paddingY = 30; // Increased padding for vertical centering feel
+             const pW = maxLineWidth + paddingX; 
+             const pH = (lines.length * lineHeightPx) + paddingY;
              let rectX = x; 
              if (layer.align === 'center') rectX = x - (pW/2); 
              if (layer.align === 'right') rectX = x - pW;
@@ -562,18 +564,24 @@ export default function StoryBuilder() {
              
              ctx.shadowColor = 'transparent'; ctx.fillStyle = layer.color;
              
-             // Draw each line
+             // --- VERTICAL CENTERING LOGIC ---
+             ctx.textBaseline = 'middle';
+             const totalTextH = lines.length * lineHeightPx;
+             const boxCenterY = y + (pH / 2);
+             // Offset to start drawing the first line so the entire block is centered
+             const startTextY = boxCenterY - (totalTextH / 2) + (lineHeightPx / 2);
+
              lines.forEach((line, i) => {
-                 let textX = rectX + 20; 
+                 let textX = rectX + (paddingX / 2); 
                  if (layer.align === 'center') textX = rectX + (pW/2); 
-                 if (layer.align === 'right') textX = rectX + pW - 20;
-                 ctx.fillText(line, textX, y + 10 + (i * lineHeightPx));
+                 if (layer.align === 'right') textX = rectX + pW - (paddingX / 2);
+                 ctx.fillText(line, textX, startTextY + (i * lineHeightPx));
              });
 
          } else {
             if (layer.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2; }
             ctx.fillStyle = layer.color;
-            // Draw each line
+            ctx.textBaseline = 'top'; // Default for non-boxed text
             lines.forEach((line, i) => {
                 ctx.fillText(line, x, y + (i * lineHeightPx));
             });
@@ -591,7 +599,6 @@ export default function StoryBuilder() {
      } else if (page.mediaType === 'video') {
         const vid = document.createElement('video');
         vid.src = page.media; vid.crossOrigin = "anonymous"; 
-        // Respect the mute setting during export loading
         vid.muted = page.videoMuted !== false;
         vid.onloadeddata = () => resolve({ ...page, videoElement: vid });
         vid.onerror = () => resolve({ ...page, videoElement: null });
@@ -649,7 +656,6 @@ export default function StoryBuilder() {
          const page = loadedPages[i]; 
          const durationFrames = page.duration * FPS;
          
-         // Start video playback if applicable
          if (page.videoElement) {
              page.videoElement.currentTime = 0;
              page.videoElement.play();
@@ -657,12 +663,7 @@ export default function StoryBuilder() {
 
          for (let frame = 0; frame < durationFrames; frame++) { 
              const progress = frame / durationFrames;
-             
-             // Sync video frame roughly
-             if (page.videoElement && !page.videoElement.paused) {
-                 // We let the video play naturally and draw the current frame
-             }
-
+             if (page.videoElement && !page.videoElement.paused) { }
              drawFrame(ctx, page, progress); 
              await new Promise(r => setTimeout(r, 1000 / FPS)); 
              setExportProgress(prev => Math.min(99, prev + (100 / (loadedPages.length * durationFrames)))); 
@@ -706,8 +707,6 @@ export default function StoryBuilder() {
          
          let mediaLayer = '';
          if (page.mediaType === 'video') {
-             // For HTML export, video blob URLs won't work cross-device.
-             // We use a warning or placeholder. For this demo, we output the URL, effectively assuming local or hosted.
              mediaLayer = `<amp-story-grid-layer template="fill"><amp-video autoplay loop width="${resolution.width}" height="${resolution.height}" layout="responsive" poster="" style="${imgFilters}"><source src="${page.media}" type="video/mp4" /></amp-video></amp-story-grid-layer>`;
          } else {
              mediaLayer = `<amp-story-grid-layer template="fill"><amp-img src="${page.media}" width="${resolution.width}" height="${resolution.height}" layout="responsive" object-position="${page.panX}% ${page.panY}%" animate-in="${page.bgAnimation==='zoom-in-pan-right'?'zoom-in':page.bgAnimation}" animate-in-duration="${page.duration*1.5}s" style="${imgFilters}"></amp-img></amp-story-grid-layer>`;
@@ -747,13 +746,9 @@ export default function StoryBuilder() {
             if (!requestRef.current.startTime) requestRef.current.startTime = time;
             let elapsed = time - requestRef.current.startTime;
             
-            // Loop Logic: Switch to NEXT page if duration exceeded
             if (elapsed > duration) {
                 const nextIndex = (activePageIndex + 1) % pages.length;
                 setActivePageIndex(nextIndex);
-                // Return immediately so we don't draw the old frame.
-                // The re-render caused by setActivePageIndex will trigger this effect again,
-                // resetting requestRef and starting the new slide's animation.
                 return; 
             }
 
@@ -923,6 +918,23 @@ export default function StoryBuilder() {
                                         </button>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* --- NEW DURATION CONTROL --- */}
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Slide Duration</h3>
+                            <div className="flex items-center gap-2 bg-[#1a1a1a] border border-white/10 rounded-lg p-1">
+                                <Clock className="w-4 h-4 text-neutral-500 ml-2"/>
+                                <select 
+                                    value={activePage.duration} 
+                                    onChange={(e) => updatePage({duration: parseInt(e.target.value)})} 
+                                    className="w-full bg-transparent border-none text-sm text-white focus:ring-0 cursor-pointer"
+                                >
+                                    {[3, 5, 10, 15, 20, 30, 45, 60].map(s => (
+                                        <option key={s} value={s}>{s < 60 ? `${s} Seconds` : '1 Minute'}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 
