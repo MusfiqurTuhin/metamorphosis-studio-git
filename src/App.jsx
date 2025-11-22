@@ -44,12 +44,24 @@ const TEXT_ANIMATIONS = [
  { value: 'scale-up', label: 'Scale Up' },
 ];
 
+// --- MUSIC CONFIGURATION ---
+// Note: Using string paths allows the code to compile even if files are missing.
+// Ensure these files are in your public/assets folder locally.
 const STOCK_MUSIC = [
  { label: 'None', value: '' },
- { label: 'Upbeat & Happy', value: 'https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3' },
- { label: 'Cinematic Dramatic', value: 'https://assets.mixkit.co/music/preview/mixkit-raising-me-higher-34.mp3' },
- { label: 'Soft & Chill', value: 'https://assets.mixkit.co/music/preview/mixkit-dreaming-big-31.mp3' },
- { label: 'Deep Urban', value: 'https://assets.mixkit.co/music/preview/mixkit-deep-urban-623.mp3' }
+ // Original Sounds
+ { label: 'Audience Boo', value: './04 Light Entertainment Audience, Boo.mp3' },
+ { label: 'Girls Changing Room', value: './09 SCHOOLS, Girls Changing Room - Ge.mp3' },
+ { label: 'Concert Applause', value: './19 Theatre AND Concert Audience, App.mp3' },
+ { label: 'Children Playing', value: './23 Babies AND Children 8-10 Years, 2.mp3' },
+ // New Added Sounds from GitHub
+ { label: 'Cinematic Short', value: './Cinematic_short.wav' },
+ { label: 'Corporate Background', value: './Corporate BackGround Minimal.wav' },
+ { label: 'Main Track (1-47)', value: './Main (1-47).wav' },
+ { label: 'Rise to Inspire', value: './Rise to Inspire - Upbeat Corporate (30s).wav' },
+ { label: 'Studio Kolomna', value: './StudioKolomna - Main Track.wav' },
+ { label: 'The Groove', value: './The Groove.wav' },
+ { label: 'Motivated Production', value: './Top Flow Production - Motivated.wav' }
 ];
 
 const FONTS = [
@@ -411,9 +423,6 @@ export default function StoryBuilder() {
          let scale = 1, tx = 0, ty = 0;
          const moveX = width * 0.1; const moveY = height * 0.1;
          
-         // Only animate background if it's an image or user wants animation on video
-         // Typically videos play themselves, so we default to static for video unless overridden, 
-         // but let's apply the selected animation for consistency.
          switch(pageData.bgAnimation) {
             case 'zoom-in': scale = 1 + (0.15 * progress); break;
             case 'zoom-out': scale = 1.15 - (0.15 * progress); break;
