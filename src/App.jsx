@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp, Music, Volume2, VolumeX, Upload, RefreshCw } from 'lucide-react';
 
-// --- LOCAL AUDIO IMPORTS ---
-// These imports work because the files exist in your src/ folder on GitHub/Vercel.
-// They might show errors in this web preview if the files aren't uploaded here, but they will build correctly on Vercel.
-import audioBoo from './04 Light Entertainment Audience, Boo.mp3';
-import audioRoom from './09 SCHOOLS, Girls Changing Room - Ge.mp3';
-import audioApplause from './19 Theatre AND Concert Audience, App.mp3';
-import audioChildren from './23 Babies AND Children 8-10 Years, 2.mp3';
-import audioCinematic from './Cinematic_short.wav';
-import audioCorporate from './Corporate BackGround Minimal.wav';
-import audioMain from './Main (1-47).wav';
-import audioRise from './Rise to Inspire - Upbeat Corporate (30s).wav';
-import audioStudio from './StudioKolomna - Main Track.wav';
-import audioGroove from './The Groove.wav';
-import audioMotivated from './Top Flow Production - Motivated.wav';
+// --- AUDIO SOURCES (GITHUB RAW) ---
+// These URLs point directly to the files in your GitHub repository. 
+// This ensures the app works in this preview environment AND on Vercel without missing file errors.
+
+const GITHUB_BASE = "https://raw.githubusercontent.com/MusfiqurTuhin/metamorphosis-studio-git/main/src";
+
+const audioBoo = `${GITHUB_BASE}/04%20Light%20Entertainment%20Audience%2C%20Boo.mp3`;
+const audioRoom = `${GITHUB_BASE}/09%20SCHOOLS%2C%20Girls%20Changing%20Room%20-%20Ge.mp3`;
+const audioApplause = `${GITHUB_BASE}/19%20Theatre%20AND%20Concert%20Audience%2C%20App.mp3`;
+const audioChildren = `${GITHUB_BASE}/23%20Babies%20AND%20Children%208-10%20Years%2C%202.mp3`;
+const audioCinematic = `${GITHUB_BASE}/Cinematic_short.wav`;
+const audioCorporate = `${GITHUB_BASE}/Corporate%20BackGround%20Minimal.wav`;
+const audioMain = `${GITHUB_BASE}/Main%20(1-47).wav`;
+const audioRise = `${GITHUB_BASE}/Rise%20to%20Inspire%20-%20Upbeat%20Corporate%20(30s).wav`;
+const audioStudio = `${GITHUB_BASE}/StudioKolomna%20-%20Main%20Track.wav`;
+const audioGroove = `${GITHUB_BASE}/The%20Groove.wav`;
+const audioMotivated = `${GITHUB_BASE}/Top%20Flow%20Production%20-%20Motivated.wav`;
 
 // --- AMP Boilerplate ---
 const AMP_BOILERPLATE = `<!DOCTYPE html>
@@ -60,13 +63,14 @@ const TEXT_ANIMATIONS = [
 ];
 
 // --- MUSIC CONFIGURATION ---
-// Mapped to the imported variables
 const STOCK_MUSIC = [
  { label: 'None', value: '' },
+ // Original Sounds
  { label: 'Audience Boo', value: audioBoo },
  { label: 'Girls Changing Room', value: audioRoom },
  { label: 'Concert Applause', value: audioApplause },
  { label: 'Children Playing', value: audioChildren },
+ // New Added Sounds from GitHub
  { label: 'Cinematic Short', value: audioCinematic },
  { label: 'Corporate Background', value: audioCorporate },
  { label: 'Main Track (1-47)', value: audioMain },
@@ -126,6 +130,7 @@ export default function StoryBuilder() {
      id: 1,
      media: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80',
      mediaType: 'image', // 'image' or 'video'
+     videoMuted: true, // Default to muted
      bgAnimation: 'zoom-in', duration: 5, panX: 50, panY: 50,
      filters: { brightness: 100, contrast: 100, saturate: 100 },
      overlay: { color: '#000000', opacity: 0.6, height: 60 },
@@ -230,11 +235,22 @@ export default function StoryBuilder() {
  useEffect(() => {
     if (activePage.mediaType === 'video' && backgroundVideoRef.current) {
         backgroundVideoRef.current.src = activePage.media;
+        // Respect the mute setting for the active page
+        backgroundVideoRef.current.muted = activePage.videoMuted !== false; 
         backgroundVideoRef.current.load();
+        
         // If we are already playing, ensure new video starts playing
         if(isPlaying) backgroundVideoRef.current.play();
     }
  }, [activePage.media, activePage.mediaType]);
+
+ // --- VIDEO MUTE SYNC ---
+ // This effect ensures that if the user toggles mute while on the same video, it updates immediately
+ useEffect(() => {
+    if (activePage.mediaType === 'video' && backgroundVideoRef.current) {
+        backgroundVideoRef.current.muted = activePage.videoMuted !== false;
+    }
+ }, [activePage.videoMuted, activePage.mediaType]);
 
  // --- IMAGE PRELOADER ---
  useEffect(() => {
@@ -304,7 +320,8 @@ export default function StoryBuilder() {
     if (file) {
         // Use ObjectURL for video performance
         const url = URL.createObjectURL(file);
-        updatePage({ media: url, mediaType: 'video' });
+        // Default videoMuted to true when a new video is uploaded to prevent immediate noise
+        updatePage({ media: url, mediaType: 'video', videoMuted: true });
     }
  };
 
@@ -573,7 +590,9 @@ export default function StoryBuilder() {
         img.onerror = () => resolve({ ...page, imgElement: null }); 
      } else if (page.mediaType === 'video') {
         const vid = document.createElement('video');
-        vid.src = page.media; vid.crossOrigin = "anonymous"; vid.muted = true;
+        vid.src = page.media; vid.crossOrigin = "anonymous"; 
+        // Respect the mute setting during export loading
+        vid.muted = page.videoMuted !== false;
         vid.onloadeddata = () => resolve({ ...page, videoElement: vid });
         vid.onerror = () => resolve({ ...page, videoElement: null });
      }
@@ -889,7 +908,22 @@ export default function StoryBuilder() {
                                     </div>
                                 </div>
                             </div>
-                            <p className="text-[10px] text-neutral-500 italic">Supports JPG, PNG, and MP4/WebM videos.</p>
+                            
+                            <div className="flex justify-between items-center mt-2">
+                                <p className="text-[10px] text-neutral-500 italic">Supports JPG, PNG, and MP4/WebM videos.</p>
+                                {activePage.mediaType === 'video' && (
+                                    <div className="flex items-center gap-2 bg-[#1a1a1a] rounded-lg p-1 border border-white/10">
+                                        <button 
+                                            onClick={() => updatePage({ videoMuted: !activePage.videoMuted })}
+                                            className={`p-1.5 rounded-md transition-colors flex items-center gap-2 ${!activePage.videoMuted ? 'bg-white text-black' : 'text-neutral-400 hover:text-white'}`}
+                                            title={activePage.videoMuted ? "Unmute Video" : "Mute Video"}
+                                        >
+                                            {activePage.videoMuted ? <VolumeX className="w-3 h-3"/> : <Volume2 className="w-3 h-3"/>}
+                                            <span className="text-[10px] font-bold pr-1">{activePage.videoMuted ? "Muted" : "Sound On"}</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="space-y-3">
