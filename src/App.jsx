@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp, Music, Volume2, VolumeX, Upload, RefreshCw } from 'lucide-react';
 
+// --- LOCAL AUDIO IMPORTS ---
+// These imports work because the files exist in your src/ folder on GitHub/Vercel.
+// They might show errors in this web preview if the files aren't uploaded here, but they will build correctly on Vercel.
+import audioBoo from './04 Light Entertainment Audience, Boo.mp3';
+import audioRoom from './09 SCHOOLS, Girls Changing Room - Ge.mp3';
+import audioApplause from './19 Theatre AND Concert Audience, App.mp3';
+import audioChildren from './23 Babies AND Children 8-10 Years, 2.mp3';
+import audioCinematic from './Cinematic_short.wav';
+import audioCorporate from './Corporate BackGround Minimal.wav';
+import audioMain from './Main (1-47).wav';
+import audioRise from './Rise to Inspire - Upbeat Corporate (30s).wav';
+import audioStudio from './StudioKolomna - Main Track.wav';
+import audioGroove from './The Groove.wav';
+import audioMotivated from './Top Flow Production - Motivated.wav';
+
 // --- AMP Boilerplate ---
 const AMP_BOILERPLATE = `<!DOCTYPE html>
 <html amp lang="en">
@@ -45,23 +60,20 @@ const TEXT_ANIMATIONS = [
 ];
 
 // --- MUSIC CONFIGURATION ---
-// Note: Using string paths allows the code to compile even if files are missing.
-// Ensure these files are in your public/assets folder locally.
+// Mapped to the imported variables
 const STOCK_MUSIC = [
  { label: 'None', value: '' },
- // Original Sounds
- { label: 'Audience Boo', value: './04 Light Entertainment Audience, Boo.mp3' },
- { label: 'Girls Changing Room', value: './09 SCHOOLS, Girls Changing Room - Ge.mp3' },
- { label: 'Concert Applause', value: './19 Theatre AND Concert Audience, App.mp3' },
- { label: 'Children Playing', value: './23 Babies AND Children 8-10 Years, 2.mp3' },
- // New Added Sounds from GitHub
- { label: 'Cinematic Short', value: './Cinematic_short.wav' },
- { label: 'Corporate Background', value: './Corporate BackGround Minimal.wav' },
- { label: 'Main Track (1-47)', value: './Main (1-47).wav' },
- { label: 'Rise to Inspire', value: './Rise to Inspire - Upbeat Corporate (30s).wav' },
- { label: 'Studio Kolomna', value: './StudioKolomna - Main Track.wav' },
- { label: 'The Groove', value: './The Groove.wav' },
- { label: 'Motivated Production', value: './Top Flow Production - Motivated.wav' }
+ { label: 'Audience Boo', value: audioBoo },
+ { label: 'Girls Changing Room', value: audioRoom },
+ { label: 'Concert Applause', value: audioApplause },
+ { label: 'Children Playing', value: audioChildren },
+ { label: 'Cinematic Short', value: audioCinematic },
+ { label: 'Corporate Background', value: audioCorporate },
+ { label: 'Main Track (1-47)', value: audioMain },
+ { label: 'Rise to Inspire', value: audioRise },
+ { label: 'Studio Kolomna', value: audioStudio },
+ { label: 'The Groove', value: audioGroove },
+ { label: 'Motivated Production', value: audioMotivated }
 ];
 
 const FONTS = [
