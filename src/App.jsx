@@ -514,6 +514,48 @@ export default function StoryBuilder() {
         };
     }, [dragTarget, handleMove, handleEnd]);
 
+    // --- INLINE FONT PARSER ---
+    // Parses text like: "{Playfair:Hello} {Hind Siliguri:বিশ্ব}" into segments
+    const parseInlineFonts = (text, defaultFont) => {
+        const segments = [];
+        const regex = /\{([^:]+):([^}]+)\}/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(text)) !== null) {
+            // Add text before the match (if any) with default font
+            if (match.index > lastIndex) {
+                const plainText = text.substring(lastIndex, match.index);
+                if (plainText) segments.push({ font: defaultFont, text: plainText });
+            }
+
+            // Add the matched segment with custom font
+            const fontName = match[1].trim();
+            const segmentText = match[2];
+            // Find the font value from FONTS array
+            const font = FONTS.find(f => f.label === fontName);
+            segments.push({
+                font: font ? font.value : defaultFont,
+                text: segmentText
+            });
+
+            lastIndex = regex.lastIndex;
+        }
+
+        // Add remaining text with default font
+        if (lastIndex < text.length) {
+            const remainingText = text.substring(lastIndex);
+            if (remainingText) segments.push({ font: defaultFont, text: remainingText });
+        }
+
+        // If no segments found, return the whole text with default font
+        if (segments.length === 0) {
+            segments.push({ font: defaultFont, text });
+        }
+
+        return segments;
+    };
+
     // --- RENDERER ---
     const drawFrame = (ctx, pageData, progress) => {
         if (!ctx) return;
