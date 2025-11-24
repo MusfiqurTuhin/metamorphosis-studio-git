@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Download, Image as ImageIcon, Type, Play, Smartphone, Settings, ChevronRight, ChevronLeft, Video, Loader2, Palette, Layout, Monitor, Move, AlertTriangle, Layers, FileVideo, Check, Sparkles, Film, Camera, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, Pause, Copy, Sun, Contrast, Droplet, ArrowUp, X, Grid, Scaling, Menu, FileCode, Film as FilmIcon, ChevronDown, ChevronUp, Music, Volume2, VolumeX, Upload, RefreshCw, Clock } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- AUDIO SOURCES (GITHUB RAW) ---
 // These URLs point directly to the files in your GitHub repository. 
@@ -1313,6 +1314,7 @@ export default function StoryBuilder() {
                     </div>
                 </div>
             </div>
+            <Analytics />
         </div>
     );
 }
