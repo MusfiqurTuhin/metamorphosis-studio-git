@@ -266,10 +266,36 @@ export default function StoryBuilder() {
             img.src = activePage.media;
             img.onload = () => {
                 loadedImageRef.current = img;
-                drawFrame(canvasRef.current?.getContext('2d'), { ...activePage, imgElement: img }, 1.0);
+                drawFrame(canvasRef.current?.getContext('2d'), { ...activePage, imgElement: img, imageElements: loadedImageLayersRef.current }, 1.0);
             };
         }
     }, [activePage.media, activePage.mediaType]);
+
+    // --- IMAGE LAYER PRELOADER ---
+    useEffect(() => {
+        const images = activePage.images || [];
+        if (images.length === 0) {
+            loadedImageLayersRef.current = [];
+            return;
+        }
+
+        const loadImages = images.map(imgLayer => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.src = imgLayer.src;
+                img.onload = () => resolve(img);
+                img.onerror = () => resolve(null);
+            });
+        });
+
+        Promise.all(loadImages).then(loaded => {
+            loadedImageLayersRef.current = loaded;
+            // Redraw canvas with new images
+            const ctx = canvasRef.current?.getContext('2d');
+            if (ctx) drawFrame(ctx, { ...activePage, imgElement: loadedImageRef.current, videoElement: backgroundVideoRef.current, imageElements: loaded }, 1.0);
+        });
+    }, [activePage.images]);
 
 
     // --- FUNCTIONS ---
