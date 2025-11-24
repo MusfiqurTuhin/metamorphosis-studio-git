@@ -145,7 +145,8 @@ export default function StoryBuilder() {
                     ...DEFAULT_TEXT_STYLE,
                     x: 6, y: 75, size: 38, color: '#e0e0e0', shadow: true, animation: 'fade-up'
                 }
-            ]
+            ],
+            images: [] // Image/logo overlay layers
         }
     ]);
 
@@ -168,21 +169,26 @@ export default function StoryBuilder() {
     const backgroundVideoRef = useRef(null); // HIDDEN VIDEO ELEMENT FOR PLAYBACK
     const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
     const loadedImageRef = useRef(null);
+    const loadedImageLayersRef = useRef([]); // For image overlay layers
     const requestRef = useRef(null);
 
     const activePage = pages[activePageIndex] || pages[0];
-    const activeLayer = activePage.texts.find(t => t.id === activeLayerId);
+    const activeLayer = activePage.texts.find(t => t.id === activeLayerId) ||
+        (activePage.images || []).find(img => img.id === activeLayerId);
+    const activeLayerType = activePage.texts.find(t => t.id === activeLayerId) ? 'text' :
+        (activePage.images || []).find(img => img.id === activeLayerId) ? 'image' : null;
 
     // --- INIT & SAFETY ---
     useEffect(() => {
-        if (activePage.texts.length > 0) {
-            if (!activeLayerId || !activePage.texts.find(t => t.id === activeLayerId)) {
+        const allLayers = [...activePage.texts, ...(activePage.images || [])];
+        if (allLayers.length > 0) {
+            if (!activeLayerId || !allLayers.find(l => l.id === activeLayerId)) {
                 if (activeLayerId) setActiveLayerId(null);
             }
         } else {
             setActiveLayerId(null);
         }
-    }, [activePageIndex, activePage.texts, activeLayerId]);
+    }, [activePageIndex, activePage.texts, activePage.images, activeLayerId]);
 
     // --- RESIZING ENGINE ---
     useEffect(() => {
@@ -349,11 +355,42 @@ export default function StoryBuilder() {
         setActiveTab('design');
     };
 
+    const addImageLayer = (imageSrc) => {
+        const newId = Date.now().toString();
+        const newImage = {
+            id: newId, src: imageSrc,
+            x: 50, y: 50, width: 30, opacity: 1 // width as percentage
+        };
+        setPages(prevPages => {
+            const newPages = [...prevPages];
+            const currentPage = newPages[activePageIndex];
+            const images = currentPage.images || [];
+            newPages[activePageIndex] = { ...currentPage, images: [...images, newImage] };
+            return newPages;
+        });
+        setActiveLayerId(newId);
+        setActiveTab('design');
+    };
+
+    const updateImageLayer = (id, field, value) => {
+        setPages(prevPages => {
+            const newPages = [...prevPages];
+            const currentPage = newPages[activePageIndex];
+            const newImages = (currentPage.images || []).map(img => img.id === id ? { ...img, [field]: value } : img);
+            newPages[activePageIndex] = { ...currentPage, images: newImages };
+            return newPages;
+        });
+    };
+
     const deleteLayer = (id) => {
         setPages(prevPages => {
             const newPages = [...prevPages];
             const currentPage = newPages[activePageIndex];
-            newPages[activePageIndex] = { ...currentPage, texts: currentPage.texts.filter(t => t.id !== id) };
+            newPages[activePageIndex] = {
+                ...currentPage,
+                texts: currentPage.texts.filter(t => t.id !== id),
+                images: (currentPage.images || []).filter(img => img.id !== id)
+            };
             return newPages;
         });
         if (activeLayerId === id) setActiveLayerId(null);
@@ -365,7 +402,8 @@ export default function StoryBuilder() {
             const newId = Date.now();
             const newPage = {
                 ...lastPage, id: newId,
-                texts: lastPage.texts.map(t => ({ ...t, id: Math.random().toString() }))
+                texts: lastPage.texts.map(t => ({ ...t, id: Math.random().toString() })),
+                images: (lastPage.images || []).map(img => ({ ...img, id: Math.random().toString() }))
             };
             return [...prevPages, newPage];
         });
@@ -600,6 +638,23 @@ export default function StoryBuilder() {
             }
             ctx.restore();
         });
+
+        // --- RENDER IMAGE LAYERS ---
+        (pageData.images || []).forEach((imgLayer, index) => {
+            const imgEl = pageData.imageElements ? pageData.imageElements[index] : null;
+            if (!imgEl || !imgEl.complete) return;
+
+            ctx.save();
+            ctx.globalAlpha = imgLayer.opacity || 1;
+
+            const imgX = width * (imgLayer.x / 100);
+            const imgY = height * (imgLayer.y / 100);
+            const imgWidth = width * (imgLayer.width / 100);
+            const imgHeight = (imgWidth / imgEl.width) * imgEl.height; // maintain aspect ratio
+
+            ctx.drawImage(imgEl, imgX, imgY, imgWidth, imgHeight);
+            ctx.restore();
+        });
     };
 
     // --- EXPORT ---
@@ -753,7 +808,7 @@ export default function StoryBuilder() {
         const render = (time) => {
             const img = loadedImageRef.current;
             const vid = backgroundVideoRef.current;
-            const pageData = { ...activePage, imgElement: img, videoElement: vid };
+            const pageData = { ...activePage, imgElement: img, videoElement: vid, imageElements: loadedImageLayersRef.current };
 
             if (isPlaying) {
                 const duration = activePage.duration * 1000;
@@ -873,7 +928,20 @@ export default function StoryBuilder() {
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center">
                                         <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Layers</h3>
-                                        <button onClick={addTextLayer} className="bg-white/10 hover:bg-white/20 text-orange-500 p-1.5 rounded transition-colors"><Plus className="w-4 h-4" /></button>
+                                        <div className="flex gap-2">
+                                            <button onClick={addTextLayer} className="bg-white/10 hover:bg-white/20 text-orange-500 p-1.5 rounded transition-colors" title="Add Text"><Type className="w-4 h-4" /></button>
+                                            <label className="bg-white/10 hover:bg-white/20 text-blue-500 p-1.5 rounded transition-colors cursor-pointer" title="Add Image">
+                                                <ImageIcon className="w-4 h-4" />
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => addImageLayer(reader.result);
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }} />
+                                            </label>
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         {(activePage.texts || []).map(text => (
@@ -885,7 +953,16 @@ export default function StoryBuilder() {
                                                 <button onClick={(e) => { e.stopPropagation(); deleteLayer(text.id); }} className="text-neutral-600 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
                                             </div>
                                         ))}
-                                        {activePage.texts.length === 0 && <div className="text-center py-8 text-neutral-600 text-sm border border-dashed border-white/10 rounded-lg">No text layers. Click + to add.</div>}
+                                        {(activePage.images || []).map(img => (
+                                            <div key={img.id} onClick={() => { setActiveLayerId(img.id); setActiveTab('design'); }} className={`p-3 rounded-lg border cursor-pointer flex items-center justify-between group transition-all ${activeLayerId === img.id ? 'bg-[#2a2a2a] border-blue-500/50' : 'bg-[#1a1a1a] border-white/5 hover:border-white/20'}`}>
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <ImageIcon className={`w-4 h-4 flex-shrink-0 ${activeLayerId === img.id ? 'text-blue-500' : 'text-neutral-600'}`} />
+                                                    <span className="truncate text-sm font-medium text-gray-300">Image</span>
+                                                </div>
+                                                <button onClick={(e) => { e.stopPropagation(); deleteLayer(img.id); }} className="text-neutral-600 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
+                                            </div>
+                                        ))}
+                                        {activePage.texts.length === 0 && (activePage.images || []).length === 0 && <div className="text-center py-8 text-neutral-600 text-sm border border-dashed border-white/10 rounded-lg">No layers. Click + to add.</div>}
                                     </div>
                                 </div>
 
