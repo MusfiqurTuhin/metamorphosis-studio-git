@@ -456,7 +456,9 @@ export default function StoryBuilder() {
         if (target === 'bg') {
             initialX = activePage.panX; initialY = activePage.panY;
         } else {
-            const layer = activePage.texts.find(t => t.id === target);
+            const textLayer = activePage.texts.find(t => t.id === target);
+            const imageLayer = (activePage.images || []).find(img => img.id === target);
+            const layer = textLayer || imageLayer;
             if (layer) { initialX = layer.x; initialY = layer.y; }
         }
         const coords = getClientCoordinates(e);
@@ -478,10 +480,22 @@ export default function StoryBuilder() {
         } else {
             const dX = (dxPx / (resolution.width * previewScale)) * 100;
             const dY = (dyPx / (resolution.height * previewScale)) * 100;
-            updateTextLayer(dragTarget, 'x', Math.min(100, Math.max(0, dragStartRef.current.initialX + dX)));
-            updateTextLayer(dragTarget, 'y', Math.min(100, Math.max(0, dragStartRef.current.initialY + dY)));
+            const newX = Math.min(100, Math.max(0, dragStartRef.current.initialX + dX));
+            const newY = Math.min(100, Math.max(0, dragStartRef.current.initialY + dY));
+
+            // Check if it's a text or image layer
+            const isTextLayer = activePage.texts.find(t => t.id === dragTarget);
+            const isImageLayer = (activePage.images || []).find(img => img.id === dragTarget);
+
+            if (isTextLayer) {
+                updateTextLayer(dragTarget, 'x', newX);
+                updateTextLayer(dragTarget, 'y', newY);
+            } else if (isImageLayer) {
+                updateImageLayer(dragTarget, 'x', newX);
+                updateImageLayer(dragTarget, 'y', newY);
+            }
         }
-    }, [dragTarget, previewScale, resolution, updatePage, updateTextLayer]);
+    }, [dragTarget, previewScale, resolution, updatePage, updateTextLayer, updateImageLayer]);
 
     const handleEnd = useCallback(() => setDragTarget(null), []);
 
@@ -927,6 +941,30 @@ export default function StoryBuilder() {
                                             userSelect: 'none', whiteSpace: 'nowrap', pointerEvents: 'none'
                                         }}>{text.uppercase ? text.content.toUpperCase() : text.content}</div>
                                         {activeLayerId === text.id && <div className="absolute -top-6 -right-6 bg-orange-500 text-white p-2.5 rounded-full shadow-lg scale-90 md:scale-100 pointer-events-none"><Move className="w-4 h-4" /></div>}
+                                    </div>
+                                );
+                            })}
+                            {(activePage.images || []).map((imgLayer, index) => {
+                                const imgEl = loadedImageLayersRef.current[index];
+                                if (!imgEl) return null;
+
+                                const imgWidth = resolution.width * (imgLayer.width / 100);
+                                const imgHeight = (imgWidth / imgEl.width) * imgEl.height;
+
+                                return (
+                                    <div key={imgLayer.id}
+                                        onMouseDown={(e) => startDrag(e, imgLayer.id)}
+                                        onTouchStart={(e) => startDrag(e, imgLayer.id)}
+                                        className={`absolute cursor-move transition-all ${activeLayerId === imgLayer.id ? 'border-dashed border-2 border-blue-500/80 z-50' : 'border-2 border-transparent hover:border-white/20 z-10'}`}
+                                        style={{
+                                            left: `${imgLayer.x}%`,
+                                            top: `${imgLayer.y}%`,
+                                            width: `${imgWidth}px`,
+                                            height: `${imgHeight}px`,
+                                            opacity: imgLayer.opacity
+                                        }}>
+                                        <img src={imgLayer.src} alt="Layer" className="w-full h-full object-contain pointer-events-none" />
+                                        {activeLayerId === imgLayer.id && <div className="absolute -top-6 -right-6 bg-blue-500 text-white p-2.5 rounded-full shadow-lg scale-90 md:scale-100 pointer-events-none"><Move className="w-4 h-4" /></div>}
                                     </div>
                                 );
                             })}
