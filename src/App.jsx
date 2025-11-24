@@ -129,7 +129,8 @@ export default function StoryBuilder() {
         {
             id: 1,
             media: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80',
-            mediaType: 'image', // 'image' or 'video'
+            mediaType: 'image', // 'image', 'video', or 'color'
+            bgColor: '#1a1a1a', // For solid color backgrounds
             videoMuted: true, // Default to muted
             bgAnimation: 'zoom-in', duration: 5, panX: 50, panY: 50,
             filters: { brightness: 100, contrast: 100, saturate: 100 },
@@ -357,6 +358,10 @@ export default function StoryBuilder() {
         }
     };
 
+    const handleColorBackgroundSelect = (color) => {
+        updatePage({ bgColor: color, mediaType: 'color' });
+    };
+
     const handleAudioUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -562,53 +567,60 @@ export default function StoryBuilder() {
         const { width, height } = ctx.canvas;
         ctx.fillStyle = '#111'; ctx.fillRect(0, 0, width, height);
 
-        // DRAW BACKGROUND (Image or Video)
-        const mediaSource = pageData.mediaType === 'video' ? pageData.videoElement : pageData.imgElement;
+        // DRAW BACKGROUND (Image, Video, or Solid Color)
+        if (pageData.mediaType === 'color') {
+            // Solid color background
+            ctx.fillStyle = pageData.bgColor || '#1a1a1a';
+            ctx.fillRect(0, 0, width, height);
+        } else {
+            // Image or Video background
+            const mediaSource = pageData.mediaType === 'video' ? pageData.videoElement : pageData.imgElement;
 
-        if (mediaSource) {
-            ctx.save();
-            if (pageData.filters) ctx.filter = `brightness(${pageData.filters.brightness}%) contrast(${pageData.filters.contrast}%) saturate(${pageData.filters.saturate}%)`;
+            if (mediaSource) {
+                ctx.save();
+                if (pageData.filters) ctx.filter = `brightness(${pageData.filters.brightness}%) contrast(${pageData.filters.contrast}%) saturate(${pageData.filters.saturate}%)`;
 
-            let scale = 1, tx = 0, ty = 0;
-            const moveX = width * 0.1; const moveY = height * 0.1;
+                let scale = 1, tx = 0, ty = 0;
+                const moveX = width * 0.1; const moveY = height * 0.1;
 
-            switch (pageData.bgAnimation) {
-                case 'zoom-in': scale = 1 + (0.15 * progress); break;
-                case 'zoom-out': scale = 1.15 - (0.15 * progress); break;
-                case 'pan-left': scale = 1.2; tx = (moveX * 0.5) - (moveX * progress); break;
-                case 'pan-right': scale = 1.2; tx = -(moveX * 0.5) + (moveX * progress); break;
-                case 'pan-up': scale = 1.2; ty = (moveY * 0.5) - (moveY * progress); break;
-                case 'pan-down': scale = 1.2; ty = -(moveY * 0.5) + (moveY * progress); break;
-                case 'zoom-in-pan-right': scale = 1.1 + (0.1 * progress); tx = -(moveX * 0.5) + (moveX * progress); break;
-                default: scale = 1;
+                switch (pageData.bgAnimation) {
+                    case 'zoom-in': scale = 1 + (0.15 * progress); break;
+                    case 'zoom-out': scale = 1.15 - (0.15 * progress); break;
+                    case 'pan-left': scale = 1.2; tx = (moveX * 0.5) - (moveX * progress); break;
+                    case 'pan-right': scale = 1.2; tx = -(moveX * 0.5) + (moveX * progress); break;
+                    case 'pan-up': scale = 1.2; ty = (moveY * 0.5) - (moveY * progress); break;
+                    case 'pan-down': scale = 1.2; ty = -(moveY * 0.5) + (moveY * progress); break;
+                    case 'zoom-in-pan-right': scale = 1.1 + (0.1 * progress); tx = -(moveX * 0.5) + (moveX * progress); break;
+                    default: scale = 1;
+                }
+
+                ctx.translate(width / 2, height / 2); ctx.scale(scale, scale); ctx.translate(tx, ty); ctx.translate(-width / 2, -height / 2);
+
+                // Aspect Ratio Logic
+                let srcW, srcH;
+                if (pageData.mediaType === 'video') {
+                    srcW = mediaSource.videoWidth || 100;
+                    srcH = mediaSource.videoHeight || 100;
+                } else {
+                    srcW = mediaSource.width;
+                    srcH = mediaSource.height;
+                }
+
+                const mediaAspect = srcW / srcH;
+                const canvasAspect = width / height;
+                let renderW, renderH, offX, offY;
+
+                if (mediaAspect > canvasAspect) {
+                    renderH = height; renderW = height * mediaAspect;
+                    offX = (width - renderW) * (pageData.panX / 100); offY = 0;
+                } else {
+                    renderW = width; renderH = width / mediaAspect;
+                    offX = 0; offY = (height - renderH) * (pageData.panY / 100);
+                }
+
+                ctx.drawImage(mediaSource, offX, offY, renderW, renderH);
+                ctx.restore();
             }
-
-            ctx.translate(width / 2, height / 2); ctx.scale(scale, scale); ctx.translate(tx, ty); ctx.translate(-width / 2, -height / 2);
-
-            // Aspect Ratio Logic
-            let srcW, srcH;
-            if (pageData.mediaType === 'video') {
-                srcW = mediaSource.videoWidth || 100;
-                srcH = mediaSource.videoHeight || 100;
-            } else {
-                srcW = mediaSource.width;
-                srcH = mediaSource.height;
-            }
-
-            const mediaAspect = srcW / srcH;
-            const canvasAspect = width / height;
-            let renderW, renderH, offX, offY;
-
-            if (mediaAspect > canvasAspect) {
-                renderH = height; renderW = height * mediaAspect;
-                offX = (width - renderW) * (pageData.panX / 100); offY = 0;
-            } else {
-                renderW = width; renderH = width / mediaAspect;
-                offX = 0; offY = (height - renderH) * (pageData.panY / 100);
-            }
-
-            ctx.drawImage(mediaSource, offX, offY, renderW, renderH);
-            ctx.restore();
         }
 
         const ov = pageData.overlay || { color: '#000000', opacity: 0.6, height: 40 };
@@ -857,7 +869,9 @@ export default function StoryBuilder() {
             }).join('');
 
             let mediaLayer = '';
-            if (page.mediaType === 'video') {
+            if (page.mediaType === 'color') {
+                mediaLayer = `<amp-story-grid-layer template="fill"><div style="background-color: ${page.bgColor}; width: 100%; height: 100%;"></div></amp-story-grid-layer>`;
+            } else if (page.mediaType === 'video') {
                 mediaLayer = `<amp-story-grid-layer template="fill"><amp-video autoplay loop width="${resolution.width}" height="${resolution.height}" layout="responsive" poster="" style="${imgFilters}"><source src="${page.media}" type="video/mp4" /></amp-video></amp-story-grid-layer>`;
             } else {
                 mediaLayer = `<amp-story-grid-layer template="fill"><amp-img src="${page.media}" width="${resolution.width}" height="${resolution.height}" layout="responsive" object-position="${page.panX}% ${page.panY}%" animate-in="${page.bgAnimation === 'zoom-in-pan-right' ? 'zoom-in' : page.bgAnimation}" animate-in-duration="${page.duration * 1.5}s" style="${imgFilters}"></amp-img></amp-story-grid-layer>`;
@@ -1077,13 +1091,15 @@ export default function StoryBuilder() {
                                 <div className="space-y-3">
                                     <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Media Background</h3>
                                     <div className="relative group rounded-xl overflow-hidden border border-white/10 bg-[#1a1a1a] aspect-video shadow-lg">
-                                        {activePage.mediaType === 'video' ? (
+                                        {activePage.mediaType === 'color' ? (
+                                            <div style={{ backgroundColor: activePage.bgColor }} className="w-full h-full group-hover:opacity-40 transition-opacity" />
+                                        ) : activePage.mediaType === 'video' ? (
                                             <video src={activePage.media} className="w-full h-full object-cover opacity-80 group-hover:opacity-40 transition-opacity" autoPlay loop muted />
                                         ) : (
                                             <img src={activePage.media} className="w-full h-full object-cover opacity-80 group-hover:opacity-40 transition-opacity" alt="Preview" />
                                         )}
                                         <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-3 bg-black/50 backdrop-blur-sm">
-                                            <div className="flex gap-4">
+                                            <div className="flex gap-3">
                                                 <label className="cursor-pointer flex flex-col items-center gap-1 group/btn">
                                                     <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20 group-hover/btn:bg-white/20 transition-colors">
                                                         <ImageIcon className="w-5 h-5 text-white" />
@@ -1098,12 +1114,21 @@ export default function StoryBuilder() {
                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">Video</span>
                                                     <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
                                                 </label>
+                                                <label htmlFor="colorBgPicker" className="cursor-pointer flex flex-col items-center gap-1 group/btn">
+                                                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20 group-hover/btn:bg-white/20 transition-colors">
+                                                        <Palette className="w-5 h-5 text-white" />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Color</span>
+                                                    <input id="colorBgPicker" type="color" value={activePage.bgColor || '#1a1a1a'} className="hidden" onChange={(e) => handleColorBackgroundSelect(e.target.value)} />
+                                                </label>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="flex justify-between items-center mt-2">
-                                        <p className="text-[10px] text-neutral-500 italic">Supports JPG, PNG, and MP4/WebM videos.</p>
+                                        <p className="text-[10px] text-neutral-500 italic">
+                                            {activePage.mediaType === 'color' ? 'Solid color background' : 'Supports JPG, PNG, and MP4/WebM videos.'}
+                                        </p>
                                         {activePage.mediaType === 'video' && (
                                             <div className="flex items-center gap-2 bg-[#1a1a1a] rounded-lg p-1 border border-white/10">
                                                 <button
