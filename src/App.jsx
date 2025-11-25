@@ -145,7 +145,7 @@ export default function StoryBuilder() {
                 {
                     id: 's1', content: 'Metamorphosis: Transforming business with modern solutions.',
                     ...DEFAULT_TEXT_STYLE,
-                    x: 6, y: 75, size: 38, color: '#e0e0e0', shadow: true, animation: 'fade-up'
+                    x: 6, y: 75, size: 38, color: '#e0e0e0', shadow: false, animation: 'fade-up'
                 }
             ],
             images: [] // Image/logo overlay layers
@@ -1253,6 +1253,7 @@ export default function StoryBuilder() {
                                             <div className="flex gap-2 bg-[#1a1a1a] p-1 rounded-lg border border-white/10">
                                                 <button onClick={() => updateTextLayer(activeLayerId, 'italic', !activeLayer.italic)} className={`flex-1 p-2 rounded-md transition-colors ${activeLayer.italic ? 'bg-orange-500 text-white' : 'text-neutral-500 hover:text-white'}`}><Italic className="w-4 h-4 mx-auto" /></button>
                                                 <button onClick={() => updateTextLayer(activeLayerId, 'uppercase', !activeLayer.uppercase)} className={`flex-1 p-2 rounded-md transition-colors ${activeLayer.uppercase ? 'bg-orange-500 text-white' : 'text-neutral-500 hover:text-white'}`}><TypeIcon className="w-4 h-4 mx-auto" /></button>
+                                                <button onClick={() => updateTextLayer(activeLayerId, 'shadow', !activeLayer.shadow)} className={`flex-1 p-2 rounded-md transition-colors ${activeLayer.shadow ? 'bg-orange-500 text-white' : 'text-neutral-500 hover:text-white'}`} title={activeLayer.shadow ? 'Remove drop shadow' : 'Add drop shadow'}><Sparkles className="w-4 h-4 mx-auto" /></button>
                                                 <div className="w-px bg-white/10 mx-1"></div>
                                                 {['left', 'center', 'right'].map(a => <button key={a} onClick={() => updateTextLayer(activeLayerId, 'align', a)} className={`flex-1 p-2 rounded-md transition-colors ${activeLayer.align === a ? 'bg-white/10 text-white' : 'text-neutral-500'}`}>{a === 'left' ? <AlignLeft className="w-4 h-4 mx-auto" /> : a === 'center' ? <AlignCenter className="w-4 h-4 mx-auto" /> : <AlignRight className="w-4 h-4 mx-auto" />}</button>)}
                                             </div>
