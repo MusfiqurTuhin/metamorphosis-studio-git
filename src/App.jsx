@@ -354,8 +354,23 @@ export default function StoryBuilder() {
         if (file) {
             // Use ObjectURL for video performance
             const url = URL.createObjectURL(file);
-            // Default videoMuted to true when a new video is uploaded to prevent immediate noise
-            updatePage({ media: url, mediaType: 'video', videoMuted: true });
+            // Default videoMuted to true. Detect duration to set videoEnd.
+            const tempVid = document.createElement('video');
+            tempVid.src = url;
+            tempVid.onloadedmetadata = () => {
+                const dur = tempVid.duration || 5;
+                updatePage({
+                    media: url,
+                    mediaType: 'video',
+                    videoMuted: true,
+                    videoStart: 0,
+                    videoEnd: dur,
+                    duration: Math.ceil(dur), // Auto-set slide duration to video duration
+                    videoScale: 1,
+                    videoPanX: 0,
+                    videoPanY: 0
+                });
+            };
         }
     };
 
@@ -596,6 +611,18 @@ export default function StoryBuilder() {
                 }
 
                 ctx.translate(width / 2, height / 2); ctx.scale(scale, scale); ctx.translate(tx, ty); ctx.translate(-width / 2, -height / 2);
+
+                // --- VIDEO CROP/TRANSFORM LOGIC ---
+                if (pageData.mediaType === 'video' && pageData.videoScale) {
+                    const vs = pageData.videoScale;
+                    const vx = width * ((pageData.videoPanX || 0) / 100);
+                    const vy = height * ((pageData.videoPanY || 0) / 100);
+
+                    ctx.translate(width / 2, height / 2);
+                    ctx.scale(vs, vs);
+                    ctx.translate(vx, vy);
+                    ctx.translate(-width / 2, -height / 2);
+                }
 
                 // Aspect Ratio Logic
                 let srcW, srcH;
@@ -842,10 +869,16 @@ export default function StoryBuilder() {
             ...dest.stream.getAudioTracks()
         ]);
 
-        // Fallback or selection of mimeType
+        // Fallback or selection of mimeType. Prioritize MP4.
         let mimeType = 'video/webm';
-        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
-        else if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
+        let extension = 'webm';
+
+        if (MediaRecorder.isTypeSupported('video/mp4')) {
+            mimeType = 'video/mp4';
+            extension = 'mp4';
+        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+            mimeType = 'video/webm;codecs=vp9';
+        }
 
         const mediaRecorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 8000000 });
         const chunks = [];
@@ -853,7 +886,7 @@ export default function StoryBuilder() {
         mediaRecorder.onstop = () => {
             const blob = new Blob(chunks, { type: mimeType });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `${metadata.title.replace(/\s+/g, '-')}.webm`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `${metadata.title.replace(/\s+/g, '-')}.${extension}`; a.click();
 
             // Cleanup
             audioCtx.close();
@@ -871,7 +904,7 @@ export default function StoryBuilder() {
             const durationFrames = page.duration * FPS;
 
             if (page.videoElement) {
-                page.videoElement.currentTime = 0;
+                page.videoElement.currentTime = page.videoStart || 0;
                 try {
                     await page.videoElement.play();
                 } catch (e) { console.error("Video play failed", e); }
@@ -1216,7 +1249,112 @@ export default function StoryBuilder() {
                                             ))}
                                         </select>
                                     </div>
+                                    <p className="text-[10px] text-gray-500 text-right">Seconds</p>
                                 </div>
+
+                                {/* --- VIDEO TRIM & CROP CONTROLS --- */}
+                                {activePage.mediaType === 'video' && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 border-t border-white/10 pt-4">
+
+                                        {/* TRIM */}
+                                        <div className="space-y-2">
+                                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
+                                                <Clock className="w-3 h-3" /> Trim Video
+                                            </h3>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-[10px] text-gray-400">Start (s)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="w-full bg-neutral-900 border border-neutral-800 rounded p-2 text-white text-xs focus:border-orange-500 outline-none transition-colors"
+                                                        step="0.1"
+                                                        min="0"
+                                                        max={activePage.videoEnd || 100}
+                                                        value={activePage.videoStart || 0}
+                                                        onChange={(e) => {
+                                                            const newStart = parseFloat(e.target.value);
+                                                            const newDur = (activePage.videoEnd || 0) - newStart;
+                                                            updatePage({ videoStart: newStart, duration: Math.ceil(newDur) });
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-gray-400">End (s)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="w-full bg-neutral-900 border border-neutral-800 rounded p-2 text-white text-xs focus:border-orange-500 outline-none transition-colors"
+                                                        step="0.1"
+                                                        min={activePage.videoStart || 0}
+                                                        value={activePage.videoEnd || activePage.duration}
+                                                        onChange={(e) => {
+                                                            const newEnd = parseFloat(e.target.value);
+                                                            const newDur = newEnd - (activePage.videoStart || 0);
+                                                            updatePage({ videoEnd: newEnd, duration: Math.ceil(newDur) });
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* CROP / TRANSFORM */}
+                                        <div className="space-y-3">
+                                            <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
+                                                <Scaling className="w-3 h-3" /> Crop & Position
+                                            </h3>
+
+                                            {/* Scale */}
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-[10px] text-gray-400">
+                                                    <span>Scale</span>
+                                                    <span>{Math.round((activePage.videoScale || 1) * 100)}%</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="3"
+                                                    step="0.1"
+                                                    className="w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                                                    value={activePage.videoScale || 1}
+                                                    onChange={(e) => updatePage({ videoScale: parseFloat(e.target.value) })}
+                                                />
+                                            </div>
+
+                                            {/* Pan X */}
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-[10px] text-gray-400">
+                                                    <span>Pan Horizontal</span>
+                                                    <span>{activePage.videoPanX || 0}%</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="-50"
+                                                    max="50"
+                                                    step="1"
+                                                    className="w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                                    value={activePage.videoPanX || 0}
+                                                    onChange={(e) => updatePage({ videoPanX: parseFloat(e.target.value) })}
+                                                />
+                                            </div>
+
+                                            {/* Pan Y */}
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-[10px] text-gray-400">
+                                                    <span>Pan Vertical</span>
+                                                    <span>{activePage.videoPanY || 0}%</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="-50"
+                                                    max="50"
+                                                    step="1"
+                                                    className="w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                                    value={activePage.videoPanY || 0}
+                                                    onChange={(e) => updatePage({ videoPanY: parseFloat(e.target.value) })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="space-y-3">
                                     <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Animation</h3>
@@ -1369,9 +1507,9 @@ export default function StoryBuilder() {
                             </div>
                         )}
                     </div>
-                </div>
-            </div>
+                </div >
+            </div >
             <Analytics />
-        </div>
+        </div >
     );
 }
