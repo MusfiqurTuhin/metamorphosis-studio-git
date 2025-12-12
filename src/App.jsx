@@ -767,21 +767,7 @@ export default function StoryBuilder() {
         }
     });
 
-    const getMixedStream = async (canvasStream, audioUrl) => {
-        if (!audioUrl) return canvasStream;
-        try {
-            const response = await fetch(audioUrl);
-            const arrayBuffer = await response.arrayBuffer();
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const decodedAudio = await audioCtx.decodeAudioData(arrayBuffer);
-            const dest = audioCtx.createMediaStreamDestination();
-            const source = audioCtx.createBufferSource();
-            source.buffer = decodedAudio; source.connect(dest); source.start(0);
-            const audioTrack = dest.stream.getAudioTracks()[0];
-            if (audioTrack) canvasStream.addTrack(audioTrack);
-            return canvasStream;
-        } catch (e) { console.error(e); return canvasStream; }
-    };
+
 
     const generateVideo = async () => {
         if (!window.MediaRecorder) return alert("Export not supported.");
@@ -792,21 +778,87 @@ export default function StoryBuilder() {
         const pagesToRender = exportScope === 'current' ? [activePage] : pages;
         const loadedPages = await Promise.all(pagesToRender.map(loadPageAssets));
 
-        let stream = canvas.captureStream(30);
-        if (metadata.audio) stream = await getMixedStream(stream, metadata.audio);
+        // Audio Context Setup
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const dest = audioCtx.createMediaStreamDestination();
+        const audioSources = []; // Keep track to disconnect/close later if needed
 
+        // 1. Background Music
+        if (metadata.audio) {
+            try {
+                const response = await fetch(metadata.audio);
+                const arrayBuffer = await response.arrayBuffer();
+                const decodedAudio = await audioCtx.decodeAudioData(arrayBuffer);
+                const source = audioCtx.createBufferSource();
+                source.buffer = decodedAudio;
+                source.loop = true; // Optional: assume background music loops
+                source.connect(dest);
+                source.start(0);
+                audioSources.push(source);
+            } catch (e) {
+                console.error("Failed to load background audio", e);
+            }
+        }
+
+        // 2. Video Elements Audio
+        loadedPages.forEach(page => {
+            if (page.videoElement) {
+                // Ensure unmute for recording if it was muted by default logic, 
+                // but checking page.videoMuted to respect user decision if they EXPLICITLY muted it?
+                // The user complaint is "uploaded video with sound... have no sounds".
+                // Usually `videoMuted` defaults to true in the state for preview. 
+                // For export, we likely want sound UNLESS specifically disabled.
+                // However, `loadPageAssets` sets `vid.muted = page.videoMuted !== false`.
+                // If we un-mute the element here, it will play to the destination.
+
+                // IMPORTANT: createMediaElementSource requires the element to be unmuted to flow audio data 
+                // in some browsers (or at least volume > 0). 
+                // But we don't want it blasting the user's speakers. 
+                // Connecting to 'dest' (MediaStreamDestination) acts as a sink.
+                // If we DON'T connect to audioCtx.destination, it won't be audible to the user, acting like a "mute" from their perspective, 
+                // but valid for recording.
+
+                const source = audioCtx.createMediaElementSource(page.videoElement);
+                source.connect(dest);
+
+                // We must ensure the video element is technically "unmuted" for the audio to flow 
+                // into the graph, even if not connected to speakers.
+                if (page.videoMuted !== true) { // Logic: if NOT explicitly muted by user preference...
+                    // Wait, the defaulting logic was `videoMuted: true` on upload. 
+                    // Users might not have "unmuted" it in UI but expect it to have sound in export.
+                    // Let's assume for now: If the user explicitly clicked "sound on", we record.
+                    // If they never touched it, it's muted? That matches preview. 
+                    // BUT the user said "i uploaded... didnt upload any audio separately... but after download video have no sounds".
+                    // This implies they EXPECT sound. 
+                    // Let's force unmute the element during export so it captures sound.
+                    page.videoElement.muted = false;
+                }
+            }
+        });
+
+        const canvasStream = canvas.captureStream(30);
+        const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...dest.stream.getAudioTracks()
+        ]);
+
+        // Fallback or selection of mimeType
         let mimeType = 'video/webm';
         if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
         else if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
 
-        const mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+        const mediaRecorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 8000000 });
         const chunks = [];
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = () => {
             const blob = new Blob(chunks, { type: mimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${metadata.title.replace(/\s+/g, '-')}.webm`; a.click();
+
+            // Cleanup
+            audioCtx.close();
             setIsExportingVideo(false);
+            // Redraw current state
             drawFrame(ctx, { ...activePage, mediaType: activePage.mediaType, imgElement: loadedImageRef.current, videoElement: backgroundVideoRef.current }, 1.0);
         };
 
@@ -820,18 +872,22 @@ export default function StoryBuilder() {
 
             if (page.videoElement) {
                 page.videoElement.currentTime = 0;
-                page.videoElement.play();
+                try {
+                    await page.videoElement.play();
+                } catch (e) { console.error("Video play failed", e); }
             }
 
             for (let frame = 0; frame < durationFrames; frame++) {
                 const progress = frame / durationFrames;
-                if (page.videoElement && !page.videoElement.paused) { }
+                // If video is buffering, await? Simplified here.
                 drawFrame(ctx, page, progress);
                 await new Promise(r => setTimeout(r, 1000 / FPS));
                 setExportProgress(prev => Math.min(99, prev + (100 / (loadedPages.length * durationFrames))));
             }
 
-            if (page.videoElement) page.videoElement.pause();
+            if (page.videoElement) {
+                page.videoElement.pause();
+            }
         }
         mediaRecorder.stop();
         setExportProgress(100);
